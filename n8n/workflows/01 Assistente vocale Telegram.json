@@ -1,0 +1,711 @@
+{
+  "name": "CRM - 01 Assistente vocale (Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Assistente vocale del CRM\nMandi al bot Telegram un **vocale** o un **messaggio**. Whisper lo trascrive, Claude lo trasforma in modifiche al CRM e il bot ti chiede conferma con due pulsanti. Le modifiche vengono salvate con i **tuoi** permessi: il database ricontrolla tutto.\n\nCredenziali: Telegram API, Supabase API (chiave service_role), OpenAI (solo per i vocali), Header Auth Anthropic (`x-api-key`).",
+        "height": 260,
+        "width": 420
+      },
+      "id": "d2b62cd0-9c2c-4b4f-a979-a92835c126bf",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        -420
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {}
+      },
+      "id": "5644c718-1fa1-4e46-a9fe-e3b5230fe41d",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// IMPOSTAZIONI · modifica solo questi valori\nreturn [{\n  json: {\n    // URL del progetto Supabase (Project Settings → API), senza / finale\n    supabase_url: 'https://IL-TUO-PROGETTO.supabase.co',\n    // Modello Claude che interpreta i comandi vocali\n    modello: 'claude-opus-5-5',\n    // Livello di ragionamento: 'low' risponde in pochi secondi\n    effort: 'low',\n    // Modello OpenAI che trascrive i messaggi vocali di Telegram\n    modello_trascrizione: 'whisper-1',\n  },\n}];\n"
+      },
+      "id": "e0705315-b870-4e44-a91b-30a17484c333",
+      "name": "IMPOSTAZIONI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Modifica qui i tuoi dati",
+      "notesInFlow": true,
+      "color": 6
+    },
+    {
+      "parameters": {
+        "jsCode": "// Capisce cosa è arrivato da Telegram: vocale, testo o pulsante premuto.\nconst u = $('Telegram').first().json;\nif (u.callback_query) {\n  const q = u.callback_query;\n  const [scelta, id] = String(q.data || '').split(':');\n  return [{ json: { _dest: 'pulsante', chat_id: String(q.message.chat.id), query_id: q.id, comando_id: id, conferma: scelta === 'ok' } }];\n}\nconst m = u.message;\nif (!m) return [];\nconst chat_id = String(m.chat.id);\nconst vocale = m.voice || m.audio;\nif (vocale) return [{ json: { _dest: 'vocale', chat_id, file_id: vocale.file_id } }];\nif (m.text) {\n  const collega = m.text.trim().match(/^\\/collega(?:@\\w+)?\\s+(\\S+@\\S+)\\s+(-?\\d+)\\s*$/i);\n  if (collega) return [{ json: { _dest: 'collega', chat_id, email: collega[1].toLowerCase(), codice: collega[2] } }];\n  if (/^\\/collega\\b/i.test(m.text.trim())) {\n    return [{ json: { _dest: 'collega', chat_id, errore: 'Scrivi così: /collega email codice\\nEsempio: /collega enrico.berte@gmail.com 123456789' } }];\n  }\n  if (m.text.startsWith('/start')) {\n    return [{ json: { _dest: 'testo', chat_id, testo_utente: '', saluto: true } }];\n  }\n  return [{ json: { _dest: 'testo', chat_id, testo_utente: m.text.trim() } }];\n}\nreturn [];\n"
+      },
+      "id": "5e78eb31-ef97-4b03-aeec-0dbea31c4c8d",
+      "name": "Tipo di messaggio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 4,
+        "output": "={{ [\"vocale\",\"testo\",\"pulsante\",\"collega\"].indexOf($json._dest) }}",
+        "options": {}
+      },
+      "id": "1690310f-6ba6-4a85-af0a-d00f44640c22",
+      "name": "Vocale, testo o pulsante?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "file",
+        "fileId": "={{ $json.file_id }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "id": "8c5bb9b7-d558-45cc-afa7-215b725f4369",
+      "name": "Scarica vocale",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/audio/transcriptions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            },
+            {
+              "name": "model",
+              "value": "={{ $('IMPOSTAZIONI').first().json.modello_trascrizione }}"
+            },
+            {
+              "name": "language",
+              "value": "it"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "7f411b3c-7bd4-4392-a18d-e2a16a7e74a0",
+      "name": "Trascrivi (Whisper)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        -200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Testo del messaggio: trascritto dal vocale oppure scritto.\nconst t = $('Tipo di messaggio').first().json;\nconst testo = t._dest === 'vocale' ? String($json.text || '').trim() : t.testo_utente;\nreturn [{ json: { chat_id: t.chat_id, testo_utente: testo, saluto: !!t.saluto } }];\n"
+      },
+      "id": "cfc84df9-f955-4f11-a546-f321ee38cc49",
+      "name": "Unisci testo",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/contesto_vocale",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_canale: 'telegram', p_identificativo: $json.chat_id }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "2c25b3c9-b4aa-43a6-a355-c3defc329e10",
+      "name": "Contesto utente (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepara la richiesta a Claude con i soli dati che l'utente può vedere.\nconst CFG = $('IMPOSTAZIONI').first().json;\nconst ingresso = $('Unisci testo').first().json;\nconst ctx = $json;\nconst chat_id = ingresso.chat_id;\n\nif (!ctx.collegato) {\n  return [{ json: { _dest: 'rispondi', chat_id, testo:\n    `Questo account Telegram non è ancora collegato al CRM.\\nIl tuo codice è: ${chat_id}\\nMandalo all'amministratore, che lo collega alla tua email.` } }];\n}\nif (ingresso.saluto || !ingresso.testo_utente) {\n  return [{ json: { _dest: 'rispondi', chat_id, testo:\n    `Ciao ${ctx.nome}. Mandami un vocale o un messaggio, per esempio:\\n` +\n    '• «Ho chiamato Marco Rossi, richiamalo tra 15 giorni»\\n' +\n    '• «Collega Anna Verdi con Lucia Bianchi, sono amiche»\\n' +\n    '• «Chi non sento da tre mesi?»\\n' +\n    'Prima di salvare ti chiedo sempre conferma.' +\n    (ctx.ruolo === 'admin' ? '\\n\\nPer collegare un\\'altra persona: chiedile di scrivermi /start e poi scrivi /collega email codice' : '') } }];\n}\n\nconst dati = {\n  oggi: ctx.oggi,\n  utente: { nome: ctx.nome, ruolo: ctx.ruolo, puo_scrivere: ctx.puo_scrivere },\n  settori: ctx.settori,\n  persone: ctx.persone,\n  relazioni: ctx.relazioni,\n  trattative: ctx.trattative,\n  attivita: ctx.attivita,\n};\n\nconst istruzioni = `Sei l'assistente di un CRM italiano basato sulle relazioni tra persone. L'utente ha dettato un messaggio: può contenere errori di trascrizione nei nomi. Trasformalo in azioni sul CRM oppure rispondi alle domande usando SOLO i dati forniti.\n\nDATI (JSON): ${JSON.stringify(dati)}\n\nMESSAGGIO DELL'UTENTE: \"\"\"${ingresso.testo_utente}\"\"\"\n\nRispondi SOLO con un oggetto JSON, senza testo prima o dopo, con questa forma:\n{\"azioni\":[...], \"risposta\":\"testo per l'utente, vuoto se ci sono solo azioni\"}\nAzioni ammesse (per \"persona\", \"da\", \"a\" usa l'id esistente; per una persona nuova creata nello stesso messaggio usa il suo nome esatto):\n{\"tipo\":\"crea_persona\",\"nome\":\"\",\"tipoScheda\":\"persona|azienda\",\"ruolo\":\"\",\"azienda\":\"\",\"settori\":[\"id settore\"],\"telefono\":\"\",\"email\":\"\",\"citta\":\"\"}\n{\"tipo\":\"aggiorna_persona\",\"persona\":\"id\",\"campi\":{\"telefono|email|citta|ruolo|azienda\":\"valore\"}}\n{\"tipo\":\"crea_relazione\",\"da\":\"id o nome\",\"a\":\"id o nome\",\"relazione\":\"conoscenza|amicizia|parentela|collaborazione|presentazione|socio|cliente|fornitore\",\"nota\":\"\"}  (per \"presentazione\": \"da\" è chi ha presentato)\n{\"tipo\":\"registra_contatto\",\"persona\":\"id\",\"canale\":\"chiamata|appuntamento|messaggio\",\"testo\":\"riassunto di cosa ci si è detti\"}\n{\"tipo\":\"crea_attivita\",\"persona\":\"id o null\",\"attivita\":\"chiamata|appuntamento|promemoria\",\"data\":\"AAAA-MM-GG\",\"ora\":\"HH:MM o vuoto\",\"testo\":\"cosa fare, breve\"}\n{\"tipo\":\"aggiungi_nota\",\"persona\":\"id\",\"testo\":\"\"}\n{\"tipo\":\"crea_trattativa\",\"titolo\":\"\",\"persona\":\"id o null\",\"settore\":\"id\",\"importo\":0,\"fase\":\"Contatto|Proposta|Trattativa|Vinta|Persa\",\"scadenza\":\"AAAA-MM-GG o null\"}\n{\"tipo\":\"aggiorna_trattativa\",\"trattativa\":\"id\",\"fase\":\"Contatto|Proposta|Trattativa|Vinta|Persa\",\"importo\":null}\nRegole: calcola le date relative partendo da oggi. Non inventare dati che l'utente non ha detto. Se un nome non corrisponde a nessuna persona e non è chiaro che vada creato, non creare azioni e chiedi chiarimenti nella risposta. Se l'utente non può scrivere, non proporre azioni. Le risposte alle domande devono essere brevi, in italiano, con un elenco puntato se servono più nomi.`;\n\nreturn [{\n  json: {\n    _dest: 'claude',\n    chat_id,\n    testo_utente: ingresso.testo_utente,\n    persone: Object.fromEntries((ctx.persone || []).map((p) => [p.id, p.nome])),\n    trattative: Object.fromEntries((ctx.trattative || []).map((t) => [t.id, t.titolo])),\n    puo_scrivere: !!ctx.puo_scrivere,\n    richiesta_claude: {\n      model: CFG.modello,\n      max_tokens: 8000,\n      output_config: { effort: CFG.effort },\n      fallbacks: 'default',\n      messages: [{ role: 'user', content: istruzioni }],\n    },\n  },\n}];\n"
+      },
+      "id": "d26ea991-31e0-4bed-a89d-977bfcaffb59",
+      "name": "Prepara richiesta Claude",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ [\"claude\",\"rispondi\"].indexOf($json._dest) }}",
+        "options": {}
+      },
+      "id": "d17d695d-8c94-4996-a03b-027586c08792",
+      "name": "Utente collegato?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "server-side-fallback-2026-07-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.richiesta_claude) }}",
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "dbdac7bb-5d9c-4941-af18-20ad39cbf2a6",
+      "name": "Claude: interpreta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2200,
+        -100
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Legge la risposta di Claude e prepara il riepilogo da confermare.\nconst req = $('Prepara richiesta Claude').first().json;\nconst r = $json;\nconst chat_id = req.chat_id;\n\nconst TIPI = ['crea_persona', 'aggiorna_persona', 'crea_relazione', 'registra_contatto', 'crea_attivita', 'aggiungi_nota', 'crea_trattativa', 'aggiorna_trattativa'];\nconst REL = { conoscenza: 'si conoscono', amicizia: 'amicizia', parentela: 'parentela', collaborazione: 'lavorano insieme', presentazione: 'ha presentato', socio: 'soci', cliente: 'cliente di', fornitore: 'fornitore di' };\n\nif (r.error || r.stop_reason === 'refusal') {\n  return [{ json: { _dest: 'rispondi', chat_id, testo: 'Non sono riuscito a interpretare il messaggio. Riprova tra poco o riformulalo.' } }];\n}\nconst testo = (r.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('');\nlet out;\ntry {\n  const inizio = testo.indexOf('{'), fine = testo.lastIndexOf('}');\n  out = JSON.parse(testo.slice(inizio, fine + 1));\n} catch (e) {\n  return [{ json: { _dest: 'rispondi', chat_id, testo: 'Non ho capito. Puoi ripetere con altre parole?' } }];\n}\n\nconst azioni = (Array.isArray(out.azioni) ? out.azioni : []).filter((a) => a && TIPI.includes(a.tipo));\nconst nuovi = new Set(azioni.filter((a) => a.tipo === 'crea_persona').map((a) => String(a.nome).toLowerCase()));\nconst nome = (ref) => req.persone[ref] || (ref && nuovi.has(String(ref).toLowerCase()) ? `${ref} (nuovo)` : ref || '—');\nconst data = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric', month: 'short' }) : '');\nconst eur = (n) => (Number(n) || 0).toLocaleString('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 });\n\nconst riga = (a) => {\n  switch (a.tipo) {\n    case 'crea_persona': return `➕ Nuovo contatto: ${a.nome}${a.ruolo ? `, ${a.ruolo}` : ''}${a.citta ? `, ${a.citta}` : ''}${a.telefono ? `, ${a.telefono}` : ''}`;\n    case 'aggiorna_persona': return `✏️ ${nome(a.persona)}: ${Object.entries(a.campi || {}).map(([k, v]) => `${k} → ${v}`).join(', ')}`;\n    case 'crea_relazione': return `🔗 ${nome(a.da)} — ${REL[a.relazione] || a.relazione} — ${nome(a.a)}`;\n    case 'registra_contatto': return `📞 Contatto con ${nome(a.persona)}: ${a.testo}`;\n    case 'crea_attivita': return `⏰ ${a.testo}${a.persona ? ` (${nome(a.persona)})` : ''} · ${data(a.data)}${a.ora ? ` alle ${a.ora}` : ''}`;\n    case 'aggiungi_nota': return `📝 Nota su ${nome(a.persona)}: ${a.testo}`;\n    case 'crea_trattativa': return `💼 Nuova trattativa: ${a.titolo}${a.persona ? ` (${nome(a.persona)})` : ''} · ${eur(a.importo)}`;\n    case 'aggiorna_trattativa': return `💼 ${req.trattative[a.trattativa] || a.trattativa}${a.fase ? ` → ${a.fase}` : ''}${a.importo ? ` · ${eur(a.importo)}` : ''}`;\n  }\n  return '';\n};\n\nconst risposta = String(out.risposta || '').trim();\nif (!azioni.length || !req.puo_scrivere) {\n  const extra = azioni.length && !req.puo_scrivere ? '\\n\\nCon il tuo ruolo puoi solo consultare il CRM.' : '';\n  return [{ json: { _dest: 'rispondi', chat_id, testo: (risposta || 'Non ho trovato modifiche da fare.') + extra } }];\n}\nconst elenco = azioni.map(riga).join('\\n');\nreturn [{\n  json: {\n    _dest: 'proponi',\n    chat_id,\n    testo_utente: req.testo_utente,\n    azioni,\n    risposta,\n    testo: `${risposta ? `${risposta}\\n\\n` : ''}Ho capito queste modifiche:\\n${elenco}\\n\\nLe salvo?`,\n  },\n}];\n"
+      },
+      "id": "eb31037c-e4e0-4411-a8eb-d73b11bf734e",
+      "name": "Leggi azioni",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2420,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "expression",
+        "numberOutputs": 2,
+        "output": "={{ [\"proponi\",\"rispondi\"].indexOf($json._dest) }}",
+        "options": {}
+      },
+      "id": "3c997134-7431-44d8-a193-08c9f2cd27a3",
+      "name": "Da confermare?",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2640,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/proponi_comando_vocale",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_canale: 'telegram', p_identificativo: $json.chat_id, p_testo: $json.testo_utente, p_azioni: $json.azioni, p_risposta: $json.risposta }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "f93f1fe9-2861-4df8-a4a9-31d70ac35859",
+      "name": "Salva proposta (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        -200
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Leggi azioni').item.json.chat_id }}",
+        "text": "={{ $('Leggi azioni').item.json.testo }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "✅ Salva",
+                    "additionalFields": {
+                      "callback_data": "=ok:{{ $json.id }}"
+                    }
+                  },
+                  {
+                    "text": "✖️ Annulla",
+                    "additionalFields": {
+                      "callback_data": "=no:{{ $json.id }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "ca018606-b566-4e9d-a95e-a58f16ce429b",
+      "name": "Chiedi conferma",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        -200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.testo }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d95d8efa-55ef-462e-ab6f-317d1593668f",
+      "name": "Rispondi",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3080,
+        100
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.query_id }}",
+        "additionalFields": {
+          "text": "Ricevuto"
+        }
+      },
+      "id": "725097b0-e936-429f-a6e3-2b750d0abdd8",
+      "name": "Chiudi pulsante",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        250
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/decidi_comando_vocale",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_comando: $('Tipo di messaggio').first().json.comando_id, p_canale: 'telegram', p_identificativo: $('Tipo di messaggio').first().json.chat_id, p_conferma: $('Tipo di messaggio').first().json.conferma }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "99d07c6c-ee17-4bf3-a85c-486f3763fa7e",
+      "name": "Conferma o annulla (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        250
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Trasforma l'esito del database in un messaggio per Telegram.\nconst p = $('Tipo di messaggio').first().json;\nconst r = $json;\nif (r.stato === 'scartato') return [{ json: { chat_id: p.chat_id, testo: 'Va bene, non ho salvato niente.' } }];\nif (r.stato !== 'confermato' || !Array.isArray(r.esito)) {\n  return [{ json: { chat_id: p.chat_id, testo: (r.message || r.error) ? 'Questo comando non è più valido.' : 'Comando già gestito.' } }];\n}\nconst ok = r.esito.filter((e) => e.ok).length;\nconst ko = r.esito.filter((e) => !e.ok);\nlet testo = `✅ Salvate ${ok} modifiche.`;\nif (ko.length) testo += `\\n⚠️ ${ko.length} non salvate: ${ko.map((e) => e.errore).join('; ')}.`;\nreturn [{ json: { chat_id: p.chat_id, testo } }];\n"
+      },
+      "id": "4598214d-a9a1-4cea-a96e-78a5a121213d",
+      "name": "Esito",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/collega_telegram_da_admin",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_chat_admin: $json.chat_id, p_email: $json.email || '', p_chat_id: $json.codice || '' }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "ac2b14d8-b8ec-48d0-a74e-89bcb1895769",
+      "name": "Collega utente (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        450
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Risposta al comando /collega email codice.\nconst t = $('Tipo di messaggio').first().json;\nif (t.errore) return [{ json: { chat_id: t.chat_id, testo: t.errore } }];\nconst r = $json;\nif (r.ok) return [{ json: { chat_id: t.chat_id, testo: `✅ ${r.messaggio}. Da ora può mandarmi vocali e messaggi.` } }];\nreturn [{ json: { chat_id: t.chat_id, testo: `⚠️ ${r.errore || 'Non sono riuscito a collegare questo utente.'}` } }];\n"
+      },
+      "id": "37199d99-15a4-41b2-a501-a8d71c09a47c",
+      "name": "Esito collegamento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        450
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram": {
+      "main": [
+        [
+          {
+            "node": "IMPOSTAZIONI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IMPOSTAZIONI": {
+      "main": [
+        [
+          {
+            "node": "Tipo di messaggio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo di messaggio": {
+      "main": [
+        [
+          {
+            "node": "Vocale, testo o pulsante?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Vocale, testo o pulsante?": {
+      "main": [
+        [
+          {
+            "node": "Scarica vocale",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Unisci testo",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chiudi pulsante",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Collega utente (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scarica vocale": {
+      "main": [
+        [
+          {
+            "node": "Trascrivi (Whisper)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trascrivi (Whisper)": {
+      "main": [
+        [
+          {
+            "node": "Unisci testo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Unisci testo": {
+      "main": [
+        [
+          {
+            "node": "Contesto utente (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Contesto utente (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Prepara richiesta Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepara richiesta Claude": {
+      "main": [
+        [
+          {
+            "node": "Utente collegato?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Utente collegato?": {
+      "main": [
+        [
+          {
+            "node": "Claude: interpreta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rispondi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: interpreta": {
+      "main": [
+        [
+          {
+            "node": "Leggi azioni",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leggi azioni": {
+      "main": [
+        [
+          {
+            "node": "Da confermare?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Da confermare?": {
+      "main": [
+        [
+          {
+            "node": "Salva proposta (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rispondi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salva proposta (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Chiedi conferma",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chiudi pulsante": {
+      "main": [
+        [
+          {
+            "node": "Conferma o annulla (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferma o annulla (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Esito",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esito": {
+      "main": [
+        [
+          {
+            "node": "Rispondi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collega utente (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Esito collegamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Esito collegamento": {
+      "main": [
+        [
+          {
+            "node": "Rispondi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

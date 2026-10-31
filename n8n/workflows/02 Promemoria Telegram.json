@@ -1,0 +1,206 @@
+{
+  "name": "CRM - 02 Promemoria (Telegram)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Promemoria\nOgni 15 minuti, dalle 7 alle 21, manda su Telegram le attività scadute o in scadenza nella prossima mezz'ora a chi è assegnata. Ogni attività viene notificata una sola volta.",
+        "height": 200,
+        "width": 420
+      },
+      "id": "1b0d582d-6556-49d5-a94a-36cdf85c1e3f",
+      "name": "Nota",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -220,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/15 7-21 * * *"
+            }
+          ]
+        }
+      },
+      "id": "f6c281fc-f418-4ece-aac7-b2f80c30f481",
+      "name": "Ogni 15 minuti 7-21",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// IMPOSTAZIONI · modifica solo questi valori\nreturn [{\n  json: {\n    // URL del progetto Supabase (Project Settings → API), senza / finale\n    supabase_url: 'https://IL-TUO-PROGETTO.supabase.co',\n    // Modello Claude che interpreta i comandi vocali\n    modello: 'claude-opus-5-5',\n    // Livello di ragionamento: 'low' risponde in pochi secondi\n    effort: 'low',\n    // Modello OpenAI che trascrive i messaggi vocali di Telegram\n    modello_trascrizione: 'whisper-1',\n  },\n}];\n"
+      },
+      "id": "65458b79-e556-4a19-a861-e5f0216ddb23",
+      "name": "IMPOSTAZIONI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "notes": "Modifica qui i tuoi dati",
+      "notesInFlow": true,
+      "color": 6
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/promemoria_da_inviare",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "c23cd94d-fca7-4c92-a4f8-12814bdfef2b",
+      "name": "Promemoria da inviare (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "jsCode": "// Un messaggio Telegram per ogni promemoria in scadenza.\nreturn $input.all()\n  .filter((i) => i.json.attivita_id && i.json.identificativo)\n  .map((i) => {\n    const a = i.json;\n    const quando = a.ora ? `alle ${String(a.ora).slice(0, 5)}` : 'oggi';\n    const chi = a.persona ? `\\n👤 ${a.persona}${a.telefono ? ` · ${a.telefono}` : ''}` : '';\n    return { json: { attivita_id: a.attivita_id, chat_id: a.identificativo, testo: `⏰ Promemoria ${quando}: ${a.testo}${chi}` } };\n  });\n"
+      },
+      "id": "cbdbd6ce-cd79-4a28-ac6c-9e95dd86d80b",
+      "name": "Componi promemoria",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.testo }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "id": "b0b34c07-f5e0-42a3-a0a4-651f63b134bc",
+      "name": "Invia promemoria",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('IMPOSTAZIONI').first().json.supabase_url }}/rest/v1/rpc/segna_promemoria_inviato",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_attivita: $('Componi promemoria').item.json.attivita_id }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "4cb96e59-fc9d-4f13-abf6-671a1e5235d9",
+      "name": "Segna come inviato (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 2000
+    }
+  ],
+  "connections": {
+    "Ogni 15 minuti 7-21": {
+      "main": [
+        [
+          {
+            "node": "IMPOSTAZIONI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IMPOSTAZIONI": {
+      "main": [
+        [
+          {
+            "node": "Promemoria da inviare (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Promemoria da inviare (Supabase)": {
+      "main": [
+        [
+          {
+            "node": "Componi promemoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Componi promemoria": {
+      "main": [
+        [
+          {
+            "node": "Invia promemoria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invia promemoria": {
+      "main": [
+        [
+          {
+            "node": "Segna come inviato (Supabase)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Rome"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}

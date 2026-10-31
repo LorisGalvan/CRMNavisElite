@@ -1,0 +1,1242 @@
+<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Network CRM</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Special+Elite&display=swap">
+<style>
+/* Layout: app shell with top bar + tabs; the "Mappa" tab is a cork detective board with red string; detail opens in a side drawer (bottom sheet on phone); voice assistant is a floating mic + sheet. */
+:root{
+  --bg:#eceef1; --surface:#ffffff; --surface-2:#f4f5f7; --ink:#1b2230; --muted:#5b6576; --line:#d6dbe2;
+  --accent:#b3261e; --accent-ink:#ffffff; --accent-soft:#f6dedc;
+  --board:#c39a6b; --board-2:#b48a5c; --card:#fffdf7; --card-ink:#26221c; --card-muted:#6e6556;
+  --ok:#1f7a4d; --warn:#9a5800; --bad:#b3261e; --ok-soft:#dcefe5; --warn-soft:#f6e8d3;
+  --shadow:0 1px 2px rgba(20,25,35,.08),0 6px 18px rgba(20,25,35,.08);
+  --f-ui:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --f-tag:"Special Elite","Courier New",Courier,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11151b; --surface:#1a1f28; --surface-2:#212733; --ink:#e6e9ef; --muted:#9aa3b2; --line:#2d3441;
+  --accent:#e5594f; --accent-ink:#1a0d0b; --accent-soft:#3a1f1d;
+  --board:#3d3126; --board-2:#352a20; --card:#efe8da; --card-ink:#26221c; --card-muted:#6e6556;
+  --ok:#5cc08b; --warn:#e3a54a; --bad:#ef6a60; --ok-soft:#1d3329; --warn-soft:#3a2d1a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11151b; --surface:#1a1f28; --surface-2:#212733; --ink:#e6e9ef; --muted:#9aa3b2; --line:#2d3441;
+  --accent:#e5594f; --accent-ink:#1a0d0b; --accent-soft:#3a1f1d;
+  --board:#3d3126; --board-2:#352a20; --card:#efe8da; --card-ink:#26221c; --card-muted:#6e6556;
+  --ok:#5cc08b; --warn:#e3a54a; --bad:#ef6a60; --ok-soft:#1d3329; --warn-soft:#3a2d1a;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.35); color-scheme:dark}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-ui);display:flex;flex-direction:column;overflow:hidden}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+/* top bar */
+.top{background:var(--surface);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding-block:10px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;letter-spacing:.01em}
+.brand svg{flex:none}
+.brand small{font:400 11px var(--f-mono);color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.top .sp{flex:1}
+.who{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.who select{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:5px 8px;color:var(--ink);max-width:220px}
+.tabs{display:flex;gap:2px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--line);scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 12px;color:var(--muted);white-space:nowrap;font-weight:500}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+main{flex:1;min-height:0;position:relative}
+.view{position:absolute;inset:0;overflow:auto;padding-block:18px 96px}
+.view[hidden]{display:none!important}
+
+/* generic */
+h1,h2,h3{margin:0;text-wrap:balance}
+h2{font-size:18px;font-weight:600}
+h3{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.stack{display:flex;flex-direction:column;gap:12px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:500}
+.btn:hover{background:var(--surface-2)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri:hover{filter:brightness(1.07)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.sm{padding:4px 9px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;min-width:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:12px;border:1px solid var(--line);background:var(--surface-2);white-space:nowrap}
+.chip i{width:8px;height:8px;border-radius:50%;display:inline-block}
+.pill{font:500 11px var(--f-mono);letter-spacing:.04em;text-transform:uppercase;border-radius:4px;padding:2px 6px}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--accent-soft);color:var(--bad)}
+.pill.neu{background:var(--surface-2);color:var(--muted)}
+input[type=color]{width:56px;height:34px;padding:2px;border:1px solid var(--line);border-radius:8px;background:var(--surface-2)}
+input[type=password],input[type=text],input[type=search],input[type=email],input[type=tel],input[type=date],input[type=time],input[type=number],select,textarea{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%;min-width:0}
+textarea{resize:vertical}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);font-weight:500}
+.note-demo{font-size:12px;color:var(--muted);border:1px dashed var(--line);border-radius:8px;padding:8px 10px}
+
+/* overview */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
+.kpi b{display:block;font:500 26px var(--f-mono);font-variant-numeric:tabular-nums;margin-top:4px}
+.kpi span{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.list li{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--line)}
+.list li:first-child{border-top:0}
+.list .t{flex:1;min-width:0}
+.list .t a,.link{color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px;cursor:pointer;background:none;border:0;padding:0;font:inherit;text-align:left}
+.list .when{font:12px var(--f-mono);color:var(--muted);white-space:nowrap}
+
+/* map */
+#v-mappa{padding:0;overflow:hidden}
+.board{position:absolute;inset:0;background:
+  radial-gradient(circle at 20% 30%,rgba(0,0,0,.05) 0 1px,transparent 2px) 0 0/7px 7px,
+  radial-gradient(circle at 70% 60%,rgba(255,255,255,.06) 0 1px,transparent 2px) 0 0/11px 11px,
+  linear-gradient(160deg,var(--board),var(--board-2));touch-action:none}
+.board svg{width:100%;height:100%;display:block;cursor:grab}
+.board svg.panning{cursor:grabbing}
+.edge{fill:none;stroke:var(--accent);stroke-width:2.2;stroke-linecap:round;opacity:.9}
+.edge.dim{opacity:.12}
+.edge.hot{stroke-width:3.2}
+.edge-lbl{font:13px var(--f-tag);fill:var(--card-ink)}
+.edge-lbl-bg{fill:var(--card);opacity:.92}
+.node{cursor:pointer}
+.node .paper{fill:var(--card);stroke:rgba(0,0,0,.18)}
+.node .nm{font:15px var(--f-tag);fill:var(--card-ink)}
+.node .sub{font:11px var(--f-ui);fill:var(--card-muted)}
+.node.dim{opacity:.28}
+.node.sel .paper{stroke:var(--accent);stroke-width:2.5}
+.node.hit .paper{stroke:var(--accent);stroke-width:2;stroke-dasharray:4 3}
+.node.linking .paper{stroke:var(--ok);stroke-width:3}
+.mapbar{position:absolute;top:12px;left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));display:flex;gap:8px;flex-wrap:wrap;align-items:center;pointer-events:none}
+.mapbar>*{pointer-events:auto}
+.mapbar .glass{background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);display:flex;gap:4px;align-items:center;padding:4px}
+.mapbar input{width:180px;border:0;background:transparent}
+.mapbar .chip{cursor:pointer}
+.mapbar .chip[aria-pressed="false"]{opacity:.45}
+.zoom{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(88px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px}
+.zoom .btn{width:38px;height:38px;justify-content:center;padding:0;box-shadow:var(--shadow)}
+.maphint{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);max-width:min(420px,calc(100% - 110px));box-shadow:var(--shadow)}
+
+/* rubrica */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:640px}
+th,td{text-align:left;padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}
+th{border-top:0;font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);background:var(--surface-2)}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--surface-2)}
+
+/* deals */
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px}
+.col{background:var(--surface-2);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px}
+.col header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.col header b{font-size:13px}
+.deal{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px}
+.deal .amt{font:500 15px var(--f-mono);font-variant-numeric:tabular-nums}
+.deal select{padding:4px 6px;font-size:12px}
+
+/* agenda */
+.day{display:flex;flex-direction:column;gap:6px}
+.act{display:flex;gap:10px;align-items:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.act.done{opacity:.55}
+.act.done .t{text-decoration:line-through}
+.act input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:var(--accent);flex:none}
+.act .t{flex:1;min-width:0}
+
+/* drawer */
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--surface);border-left:1px solid var(--line);box-shadow:var(--shadow);z-index:30;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+.drawer .hd{display:flex;align-items:flex-start;gap:10px;padding:16px;border-bottom:1px solid var(--line)}
+.drawer .bd{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:18px}
+.drawer .nm{font:22px var(--f-tag);line-height:1.15}
+.kv{display:grid;grid-template-columns:96px 1fr;gap:6px 12px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;min-width:0;overflow-wrap:anywhere}
+@media (max-width:640px){.drawer{top:auto;height:78%;width:100%;border-left:0;border-top:1px solid var(--line);border-radius:14px 14px 0 0;padding-left:env(safe-area-inset-left,0px)}}
+
+/* modal + voice sheet */
+.scrim{position:fixed;inset:0;background:rgba(10,12,16,.45);z-index:40;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);width:min(520px,100%);max-height:calc(100% - 32px);overflow:auto;padding:18px;display:flex;flex-direction:column;gap:14px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form .full{grid-column:1/-1}
+@media (max-width:520px){.form{grid-template-columns:1fr}}
+.fab{position:fixed;right:max(16px,env(safe-area-inset-right,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:25;width:60px;height:60px;border-radius:50%;border:0;background:var(--accent);color:var(--accent-ink);box-shadow:0 6px 20px rgba(179,38,30,.35);display:grid;place-items:center}
+.fab.rec{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 12px rgba(179,38,30,.15),0 6px 20px rgba(179,38,30,.35)}}
+@media (prefers-reduced-motion:reduce){.fab.rec{animation:none;outline:4px solid var(--accent-soft)}}
+.voice{position:fixed;left:0;right:0;bottom:0;z-index:35;background:var(--surface);border-top:1px solid var(--line);border-radius:16px 16px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.18);max-height:82%;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom,0px)}
+.voice .in{width:min(760px,100%);margin:0 auto;padding-block:16px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.voice textarea{min-height:64px;font-size:15px}
+.wave{display:flex;gap:3px;align-items:center;height:18px}
+.wave i{width:3px;background:var(--accent);border-radius:2px;height:30%;animation:w 0.9s ease-in-out infinite}
+.wave i:nth-child(2){animation-delay:.15s}.wave i:nth-child(3){animation-delay:.3s}.wave i:nth-child(4){animation-delay:.45s}
+@keyframes w{50%{height:100%}}
+@media (prefers-reduced-motion:reduce){.wave i{animation:none;height:70%}}
+.prop{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface-2)}
+.prop input{margin-top:3px;accent-color:var(--accent);width:17px;height:17px;flex:none}
+.prop .t{flex:1;min-width:0}
+.prop .k{font:500 11px var(--f-mono);text-transform:uppercase;letter-spacing:.06em;color:var(--accent)}
+.answer{border-left:3px solid var(--accent);padding:6px 12px;background:var(--surface-2);border-radius:0 8px 8px 0;white-space:pre-wrap}
+.examples{display:flex;gap:6px;flex-wrap:wrap}
+.examples button{font-size:12px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 10px;color:var(--muted);text-align:left}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;box-shadow:var(--shadow);max-width:calc(100% - 32px)}
+#login{background:var(--bg)}
+.who #whoName{font-weight:600;color:var(--ink)}
+.wrap{max-width:1180px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+@media (max-width:640px){.who label{display:none}.mapbar input{width:120px}.who #whoName{display:none}}
+</style>
+
+<header class="top gut">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="5" cy="6" r="3" fill="var(--accent)"/><circle cx="21" cy="8" r="3" fill="var(--accent)"/><circle cx="12" cy="21" r="3" fill="var(--accent)"/><path d="M5 6 Q13 9 21 8 M5 6 Q7 15 12 21 M21 8 Q17 15 12 21" stroke="var(--accent)" stroke-width="1.6" fill="none"/></svg>
+    <span>Network CRM <small>v1.2</small></span>
+  </div>
+  <div class="sp"></div>
+  <div class="who"><label for="themeSel">Tema</label><select id="themeSel" style="width:auto"><option value="auto">Automatico</option><option value="light">Chiaro</option><option value="dark">Scuro</option></select></div>
+  <div class="who"><span id="whoName"></span><button class="btn sm" data-act="refresh" title="Ricarica i dati">Aggiorna</button><button class="btn sm" data-act="pwd">Password</button><button class="btn sm" data-act="logout">Esci</button></div>
+</header>
+<nav class="tabs gut" role="tablist" id="tabs"></nav>
+<main>
+  <section class="view gut" id="v-panoramica"></section>
+  <section class="view" id="v-mappa" hidden>
+    <div class="board" id="board"><svg id="svg" aria-label="Mappa delle relazioni"><g id="vp"><g id="gEdges"></g><g id="gNodes"></g></g></svg></div>
+    <div class="mapbar">
+      <div class="glass"><input type="search" id="mapSearch" placeholder="Cerca sulla lavagna"></div>
+      <div class="glass" id="mapFilters"></div>
+      <button class="btn" id="btnLink" title="Tocca due schede per collegarle">Collega due persone</button>
+      <button class="btn" id="btnNewP">Nuova scheda</button>
+    </div>
+    <div class="zoom"><button class="btn" id="zIn" aria-label="Ingrandisci">+</button><button class="btn" id="zOut" aria-label="Riduci">−</button><button class="btn" id="zFit" aria-label="Adatta alla schermata"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M1 5V1h4M11 1h4v4M15 11v4h-4M5 15H1v-4"/></svg></button></div>
+    <div class="maphint" id="mapHint">Trascina le schede per spostarle. Tocca una scheda per vedere i suoi collegamenti.</div>
+  </section>
+  <section class="view gut" id="v-rubrica" hidden></section>
+  <section class="view gut" id="v-trattative" hidden></section>
+  <section class="view gut" id="v-agenda" hidden></section>
+  <section class="view gut" id="v-permessi" hidden></section>
+  <section class="view gut" id="v-registro" hidden></section>
+</main>
+
+<aside class="drawer" id="drawer" hidden></aside>
+
+<button class="fab" id="fab" aria-label="Aggiorna il CRM a voce" title="Aggiorna il CRM a voce">
+  <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+</button>
+
+<div class="voice" id="voice" hidden>
+  <div class="in gut">
+    <div class="row" style="justify-content:space-between">
+      <div class="row"><h2>Assistente vocale</h2><span id="vState" class="pill neu">pronto</span><span class="wave" id="vWave" hidden><i></i><i></i><i></i><i></i></span></div>
+      <button class="btn ghost sm" id="vClose">Chiudi</button>
+    </div>
+    <label class="f" for="vText">Parla o scrivi cosa vuoi aggiornare
+      <textarea id="vText" placeholder="Es. «Ho chiamato Marco Rossi, è interessato al Riva 68. Richiamalo tra 15 giorni»"></textarea>
+    </label>
+    <div class="row">
+      <button class="btn" id="vMic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><span>Parla</span></button>
+      <button class="btn pri" id="vGo">Interpreta</button>
+      <span class="muted" id="vEngine" style="font-size:12px"></span>
+    </div>
+    <div class="examples" id="vEx"></div>
+    <div id="vOut" class="stack"></div>
+  </div>
+</div>
+<div id="toastHost"></div>
+<div class="scrim" id="login" hidden>
+  <form class="modal" id="loginForm" novalidate>
+    <div class="brand"><svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><circle cx="5" cy="6" r="3" fill="var(--accent)"/><circle cx="21" cy="8" r="3" fill="var(--accent)"/><circle cx="12" cy="21" r="3" fill="var(--accent)"/><path d="M5 6 Q13 9 21 8 M5 6 Q7 15 12 21 M21 8 Q17 15 12 21" stroke="var(--accent)" stroke-width="1.6" fill="none"/></svg><span>Network CRM</span></div>
+    <h2 id="loginTitle">Accedi</h2>
+    <label class="f" for="lEmail" id="lEmailBox">Email<input id="lEmail" type="email" autocomplete="username" required></label>
+    <label class="f" for="lPwd">Password<input id="lPwd" type="password" autocomplete="current-password" required></label>
+    <p class="muted" id="loginMsg" style="margin:0"></p>
+    <div class="row" style="justify-content:space-between"><button type="button" class="btn ghost sm" id="lForgot">Password dimenticata?</button><button class="btn pri" id="lGo">Accedi</button></div>
+  </form>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+"use strict";
+/* ================= dati ================= */
+const KEY = "networkcrm.cloud";
+const FASI = ["Contatto","Proposta","Trattativa","Vinta","Persa"];
+const TIPI_REL = {conoscenza:"Si conoscono",amicizia:"Amicizia",parentela:"Parentela",collaborazione:"Lavorano insieme",presentazione:"Ha presentato",socio:"Soci",cliente:"Cliente di",fornitore:"Fornitore di"};
+const TIPI_ATT = {chiamata:"Chiamata",appuntamento:"Appuntamento",promemoria:"Promemoria",nota:"Nota",messaggio:"Messaggio"};
+const RUOLI = {admin:"Amministratore",responsabile:"Responsabile",collaboratore:"Collaboratore",lettura:"Sola lettura"};
+const VIS = {privato:"Privata (solo tu e l'amministratore)",settore:"Settore (chi lavora negli stessi settori)",tutti:"Tutta l'organizzazione"};
+
+const iso = d => { const z = new Date(d.getTime() - d.getTimezoneOffset()*60000); return z.toISOString().slice(0,10); };
+const addDays = (n, from) => { const d = from ? new Date(from+"T12:00:00") : new Date(); d.setDate(d.getDate()+n); return iso(d); };
+const TODAY = () => iso(new Date());
+const uid = () => crypto.randomUUID();
+
+/* ================= database (Supabase) ================= */
+const SB_URL = "https://wblulveycweghgbmxvqy.supabase.co";
+// chiave pubblica: i dati sono protetti dal login e dai permessi del database
+const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndibHVsdmV5Y3dlZ2hnYm14dnF5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNDU1MDksImV4cCI6MjEwODYyMTUwOX0.JtW6jDZRAyPBpWdSBcF_t9V3yMS6tsV7mu_-vLZRYIc";
+const BOT = SB_URL + "/functions/v1/crm-bot";
+const sb = supabase.createClient(SB_URL, SB_ANON);
+let S = {settori:[], utenti:[], persone:[], relazioni:[], trattative:[], attivita:[], registro:[]};
+let ORG = null, SNAP = null, ME = null, CODA = Promise.resolve();
+
+const hhmm = t => t ? String(t).slice(0,5) : "";
+async function q(promessa){ const {data, error} = await promessa; if (error) throw error; return data || []; }
+
+async function loadDb(){
+  const mem = await q(sb.from("membri").select("org_id,user_id,nome,ruolo,attivo").eq("attivo", true));
+  const mio = mem.find(m => m.user_id === ME);
+  if (!mio) throw new Error("Questo account non è tra gli utenti del CRM.");
+  ORG = mio.org_id;
+  const [settori, ms, emails, persone, ps, pc, rel, tr, att, reg] = await Promise.all([
+    q(sb.from("settori").select("*").eq("org_id", ORG).order("nome")),
+    q(sb.from("membri_settori").select("*").eq("org_id", ORG)),
+    q(sb.rpc("membri_email", {p_org: ORG})),
+    q(sb.from("persone").select("*").eq("org_id", ORG)),
+    q(sb.from("persone_settori").select("*")),
+    q(sb.from("persone_condivisioni").select("*")),
+    q(sb.from("relazioni").select("*").eq("org_id", ORG)),
+    q(sb.from("trattative").select("*").eq("org_id", ORG)),
+    q(sb.from("attivita").select("*").eq("org_id", ORG)),
+    q(sb.from("registro").select("*").eq("org_id", ORG).order("quando", {ascending:false}).limit(300))
+  ]);
+  const posVecchie = Object.fromEntries(S.persone.map(p => [p.id, [p.x, p.y]]));
+  const vis = new Set(persone.map(p => p.id));
+  S = {
+    settori: settori.map(x => ({id:x.id, nome:x.nome, colore:x.colore})),
+    utenti: mem.filter(m => m.org_id === ORG).map(m => ({id:m.user_id, nome:m.user_id===ME ? m.nome+" (tu)" : m.nome, ruolo:m.ruolo, email:(emails.find(e => e.user_id===m.user_id)||{}).email||"", settori: ms.filter(x => x.user_id===m.user_id).map(x => x.settore_id)})),
+    persone: persone.map((p, i) => {
+      // le schede create a voce non hanno ancora una posizione: le dispongo a spirale finché qualcuno non le sposta
+      const a = i * 2.4, r = 140 + 28 * i, old = posVecchie[p.id];
+      return {id:p.id, tipo:p.tipo, nome:p.nome, ruolo:p.ruolo, azienda:p.azienda, telefono:p.telefono, email:p.email, citta:p.citta, tag:p.tag||[], visibilita:p.visibilita, ultimoContatto:p.ultimo_contatto||"",
+        x: p.pos_x ?? old?.[0] ?? 600 + Math.cos(a)*r, y: p.pos_y ?? old?.[1] ?? 380 + Math.sin(a)*r*0.7, posSalvata: p.pos_x != null,
+        settori: ps.filter(x => x.persona_id===p.id).map(x => x.settore_id), condivisiCon: pc.filter(x => x.persona_id===p.id).map(x => x.user_id), creatoDa:p.creato_da};
+    }),
+    relazioni: rel.filter(r => vis.has(r.da) && vis.has(r.a)).map(r => ({id:r.id, da:r.da, a:r.a, tipo:r.tipo, nota:r.nota, visibilita:r.privata?"privato":"tutti", creatoDa:r.creato_da})),
+    trattative: tr.map(t => ({id:t.id, titolo:t.titolo, personaId:t.persona_id, settore:t.settore_id, fase:t.fase, importo:+t.importo, responsabile:t.responsabile, scadenza:t.scadenza||""})),
+    attivita: att.map(a => ({id:a.id, tipo:a.tipo, personaId:a.persona_id, data:a.data, ora:hhmm(a.ora), testo:a.testo, fatto:a.fatto, assegnatoA:a.assegnato_a, condivisa:a.condivisa})),
+    registro: []
+  };
+  S.registro = reg.map(descriviRegistro).filter(Boolean);
+  SNAP = righe(S);
+}
+
+/* Lo stato in memoria diventa righe delle tabelle; save() confronta con l'ultima lettura e invia solo le differenze */
+function righe(st){
+  const o = {settori:{}, persone:{}, persone_settori:{}, persone_condivisioni:{}, relazioni:{}, trattative:{}, attivita:{}, membri:{}, membri_settori:{}};
+  st.settori.forEach(x => o.settori[x.id] = {id:x.id, org_id:ORG, nome:x.nome, colore:x.colore});
+  st.persone.forEach(p => {
+    o.persone[p.id] = {id:p.id, org_id:ORG, tipo:p.tipo||"persona", nome:p.nome, ruolo:p.ruolo||"", azienda:p.azienda||"", telefono:p.telefono||"", email:p.email||"", citta:p.citta||"", tag:p.tag||[], visibilita:p.visibilita, ultimo_contatto:p.ultimoContatto||null,
+      pos_x: p.posSalvata ? Math.round(p.x) : null, pos_y: p.posSalvata ? Math.round(p.y) : null};
+    (p.settori||[]).forEach(sid => o.persone_settori[p.id+"|"+sid] = {persona_id:p.id, settore_id:sid});
+    (p.condivisiCon||[]).forEach(u => o.persone_condivisioni[p.id+"|"+u] = {persona_id:p.id, user_id:u});
+  });
+  st.relazioni.forEach(r => o.relazioni[r.id] = {id:r.id, org_id:ORG, da:r.da, a:r.a, tipo:r.tipo, nota:r.nota||"", privata:r.visibilita==="privato"});
+  st.trattative.forEach(t => o.trattative[t.id] = {id:t.id, org_id:ORG, titolo:t.titolo, persona_id:t.personaId||null, settore_id:t.settore, fase:t.fase, importo:+t.importo||0, responsabile:t.responsabile||null, scadenza:t.scadenza||null});
+  st.attivita.forEach(a => o.attivita[a.id] = {id:a.id, org_id:ORG, tipo:a.tipo, persona_id:a.personaId||null, data:a.data, ora:a.ora||null, testo:a.testo, fatto:!!a.fatto, condivisa:!!a.condivisa, assegnato_a:a.assegnatoA||ME});
+  st.utenti.forEach(u => {
+    o.membri[u.id] = {org_id:ORG, user_id:u.id, ruolo:u.ruolo};
+    (u.settori||[]).forEach(sid => o.membri_settori[u.id+"|"+sid] = {org_id:ORG, user_id:u.id, settore_id:sid});
+  });
+  return o;
+}
+const ORDINE = ["settori","persone","persone_settori","persone_condivisioni","relazioni","trattative","attivita","membri","membri_settori"];
+const CHIAVI = {persone_settori:["persona_id","settore_id"], persone_condivisioni:["persona_id","user_id"], membri:["org_id","user_id"], membri_settori:["user_id","settore_id"]};
+const filtra = (query, t, riga) => (CHIAVI[t] || ["id"]).reduce((qq, k) => qq.eq(k, riga[k]), query);
+
+async function sincronizza(){
+  const nuovo = righe(S), vecchio = SNAP || {};
+  for (const t of ORDINE) {
+    for (const [k, r] of Object.entries(nuovo[t])) {
+      const prima = vecchio[t]?.[k];
+      if (!prima) { if (t !== "membri") await q(sb.from(t).insert(r)); }
+      else if (JSON.stringify(prima) !== JSON.stringify(r)) {
+        const diff = Object.fromEntries(Object.entries(r).filter(([c, v]) => JSON.stringify(prima[c]) !== JSON.stringify(v)));
+        await q(filtra(sb.from(t).update(diff), t, r));
+      }
+    }
+  }
+  for (const t of [...ORDINE].reverse()) {
+    for (const [k, r] of Object.entries(vecchio[t] || {})) if (!nuovo[t][k] && t !== "membri") await q(filtra(sb.from(t).delete(), t, r));
+  }
+}
+function save(){
+  CODA = CODA.then(async () => {
+    try { await sincronizza(); }
+    catch (e) { console.error(e); toast(e?.code === "42501" || /row-level security/i.test(e?.message||"") ? "Non hai i permessi per questa modifica." : "Modifica non salvata: " + (e?.message || "errore")); }
+    try { await loadDb(); } catch (e) { console.error(e); }
+    render();
+  });
+  return CODA;
+}
+
+/* Il registro del database diventa una frase leggibile */
+function descriviRegistro(l){
+  const d = l.dopo || l.prima || {}, pr = l.prima || {}, op = l.operazione;
+  const cambiati = l.prima && l.dopo ? Object.keys(l.dopo).filter(c => JSON.stringify(l.dopo[c]) !== JSON.stringify(l.prima[c]) && c !== "updated_at") : [];
+  const nome = id => (S.persone.find(p => p.id === id) || {}).nome || "una scheda riservata";
+  let cosa = "";
+  if (l.tabella === "persone") {
+    if (op === "UPDATE" && cambiati.every(c => c === "pos_x" || c === "pos_y")) return null;
+    if (op === "UPDATE" && cambiati.length === 1 && cambiati[0] === "ultimo_contatto") cosa = `Ultimo contatto aggiornato: ${d.nome}`;
+    else cosa = {INSERT:"Nuovo contatto", UPDATE:"Modificato il contatto", DELETE:"Eliminato il contatto"}[op] + `: ${d.nome}`;
+  } else if (l.tabella === "relazioni") cosa = `${op==="DELETE"?"Eliminato il collegamento":"Collegati"} ${nome(d.da)} e ${nome(d.a)} (${TIPI_REL[d.tipo]||d.tipo})`;
+  else if (l.tabella === "trattative") cosa = op === "UPDATE" && cambiati.includes("fase") ? `Trattativa «${d.titolo}» spostata in ${d.fase}` : `${{INSERT:"Nuova trattativa",UPDATE:"Trattativa modificata",DELETE:"Trattativa eliminata"}[op]}: ${d.titolo}`;
+  else if (l.tabella === "attivita") cosa = op === "UPDATE" && cambiati.includes("fatto") ? `${d.fatto?"Completata":"Riaperta"}: ${d.testo}` : `${op==="DELETE"?"Eliminata ":""}${TIPI_ATT[d.tipo]||d.tipo}: ${d.testo}`;
+  else return null;
+  const via = l.via === "voce:telegram" ? "Telegram" : l.via === "voce" ? "voce" : "app";
+  return {id:l.id, quando:l.quando, chi:l.user_id, cosa, via};
+}
+
+/* ================= permessi ================= */
+const me = () => S.utenti.find(u => u.id === ME) || {id:ME, nome:"", ruolo:"lettura", settori:[]};
+const isAdmin = (u=me()) => u.ruolo === "admin";
+const canEdit = (u=me()) => u.ruolo !== "lettura";
+const inter = (a,b) => (a||[]).some(x => (b||[]).includes(x));
+function seeP(p,u=me()){
+  if (!p) return false;
+  if (isAdmin(u) || p.creatoDa === u.id || (p.condivisiCon||[]).includes(u.id)) return true;
+  if (p.visibilita === "tutti") return true;
+  return p.visibilita === "settore" && inter(p.settori, u.settori);
+}
+function seeR(r,u=me()){
+  if (!seeP(P(r.da),u) || !seeP(P(r.a),u)) return false;
+  return isAdmin(u) || r.visibilita !== "privato" || r.creatoDa === u.id;
+}
+const seeT = (t,u=me()) => (isAdmin(u) || u.settori.includes(t.settore) || t.responsabile === u.id) && (!t.personaId || seeP(P(t.personaId),u));
+const seeA = (a,u=me()) => isAdmin(u) || a.assegnatoA === u.id || (a.condivisa && (!a.personaId || seeP(P(a.personaId),u)));
+const P = id => S.persone.find(p => p.id === id);
+const Sett = id => S.settori.find(s => s.id === id);
+const U = id => S.utenti.find(u => u.id === id);
+const VP = () => S.persone.filter(p => seeP(p));
+const VR = () => S.relazioni.filter(r => seeR(r));
+const VT = () => S.trattative.filter(t => seeT(t));
+const VA = () => S.attivita.filter(a => seeA(a));
+
+function log(){ /* il registro lo scrive il database */ }
+function guard(){ if (!canEdit()) { toast("Con il ruolo «Sola lettura» non puoi modificare i dati."); return false; } return true; }
+
+/* ================= utilità UI ================= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur = n => (Number(n)||0).toLocaleString("it-IT",{style:"currency",currency:"EUR",maximumFractionDigits:0});
+const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("it-IT",{weekday:"short",day:"numeric",month:"short"}) : "";
+const daysSince = d => d ? Math.round((new Date(TODAY()+"T12:00:00") - new Date(d+"T12:00:00"))/86400000) : 9999;
+function toast(msg){ const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role","status"); t.textContent = msg; $("#toastHost").replaceChildren(t); setTimeout(() => t.remove(), 3200); }
+const sChip = id => { const s = Sett(id); return s ? `<span class="chip"><i style="background:${s.colore}"></i>${esc(s.nome)}</span>` : ""; };
+const pLink = id => { const p = P(id); return p && seeP(p) ? `<button class="link" data-open="${p.id}">${esc(p.nome)}</button>` : `<span class="muted">riservato</span>`; };
+
+/* ================= tabs ================= */
+const TABS = [["panoramica","Panoramica"],["mappa","Mappa"],["rubrica","Rubrica"],["trattative","Trattative"],["agenda","Agenda"],["permessi","Permessi"],["registro","Registro"]];
+let TAB = "panoramica";
+function renderTabs(){
+  $("#tabs").innerHTML = TABS.map(([k,l]) => `<button role="tab" aria-selected="${k===TAB}" data-tab="${k}">${l}</button>`).join("");
+}
+function go(tab){
+  TAB = tab;
+  try { localStorage.setItem(KEY+".tab", tab); } catch(e){}
+  renderTabs();
+  TABS.forEach(([k]) => $("#v-"+k).hidden = k !== tab);
+  render();
+}
+function render(){
+  ({panoramica:rOverview, mappa:rMap, rubrica:rRubrica, trattative:rDeals, agenda:rAgenda, permessi:rPerm, registro:rLog})[TAB]();
+  if (!$("#drawer").hidden && DRAWER) openDrawer(DRAWER, true);
+}
+function renderUsers(){
+  const u = me(); $("#whoName").textContent = u.nome ? `${u.nome} · ${RUOLI[u.ruolo]}` : "";
+}
+
+
+/* ================= panoramica ================= */
+function rOverview(){
+  const ps = VP(), rs = VR(), ts = VT(), as = VA();
+  const open = ts.filter(t => !["Vinta","Persa"].includes(t.fase));
+  const due = as.filter(a => !a.fatto && a.tipo !== "nota" && a.data <= TODAY());
+  const next = as.filter(a => !a.fatto && a.tipo !== "nota" && a.data <= addDays(7)).sort((a,b) => (a.data+a.ora).localeCompare(b.data+b.ora));
+  const cold = ps.filter(p => daysSince(p.ultimoContatto) >= 90).sort((a,b) => daysSince(b.ultimoContatto)-daysSince(a.ultimoContatto));
+  const u = me();
+  $("#v-panoramica").innerHTML = `<div class="wrap">
+    <div class="row" style="justify-content:space-between"><div><h2>Buongiorno, ${esc(u.nome.split(" ")[0])}</h2><div class="muted">${RUOLI[u.ruolo]} · settori: ${u.settori.map(s => esc(Sett(s)?.nome)).join(", ") || "nessuno"}</div></div>
+    <div class="row"><button class="btn" data-act="newP">Nuovo contatto</button><button class="btn" data-act="newA">Nuova attività</button><button class="btn pri" data-act="voice">Aggiorna a voce</button></div></div>
+    <div class="kpis">
+      <div class="kpi"><span>Contatti visibili</span><b>${ps.length}</b></div>
+      <div class="kpi"><span>Collegamenti</span><b>${rs.length}</b></div>
+      <div class="kpi"><span>Trattative aperte</span><b>${open.length}</b><span class="mono">${eur(open.reduce((s,t)=>s+(+t.importo||0),0))}</span></div>
+      <div class="kpi"><span>Da fare oggi o scadute</span><b style="color:${due.length?"var(--bad)":"inherit"}">${due.length}</b></div>
+    </div>
+    <div class="grid2">
+      <div class="panel stack"><h3>Prossimi 7 giorni</h3>${next.length ? `<ul class="list">${next.map(actLi).join("")}</ul>` : `<p class="muted">Niente in agenda. Prova a dire «Ricordami di chiamare Anna Verdi lunedì alle 10».</p>`}</div>
+      <div class="panel stack"><h3>Da ricontattare · oltre 90 giorni</h3>${cold.length ? `<ul class="list">${cold.map(p => `<li><div class="t">${pLink(p.id)}<div class="muted" style="font-size:12px">${esc(p.ruolo)} ${p.settori.map(sChip).join(" ")}</div></div><span class="when">${daysSince(p.ultimoContatto)} gg</span></li>`).join("")}</ul>` : `<p class="muted">Hai sentito tutti negli ultimi tre mesi.</p>`}</div>
+    </div>
+    <div class="panel stack"><h3>Ultime modifiche</h3><ul class="list">${S.registro.slice(0,6).map(l => `<li><div class="t">${esc(l.cosa)}<div class="muted" style="font-size:12px">${esc(U(l.chi)?.nome||"")} · ${l.via==="voce"?"a voce":l.via}</div></div><span class="when">${new Date(l.quando).toLocaleString("it-IT",{day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}</span></li>`).join("")}</ul></div>
+    <p class="note-demo">Dati condivisi in tempo reale con chi lavora nel CRM. Quello che salvi da Telegram compare qui: premi «Aggiorna» se l'hai appena inviato.</p>
+  </div>`;
+}
+function actLi(a){
+  const late = a.data < TODAY();
+  return `<li><input type="checkbox" data-done="${a.id}" ${a.fatto?"checked":""} aria-label="Segna come fatto" ${canEdit()?"":"disabled"}><div class="t"><b style="font-weight:500">${esc(a.testo)}</b><div class="muted" style="font-size:12px">${TIPI_ATT[a.tipo]||a.tipo}${a.personaId?" · "+pLink(a.personaId):""} · ${esc(U(a.assegnatoA)?.nome||"")}</div></div><span class="when">${late?'<span class="pill bad">scaduta</span> ':""}${fmtD(a.data)}${a.ora?" "+a.ora:""}</span></li>`;
+}
+
+/* ================= mappa ================= */
+const NW = 168, NH = 58;
+let view = {x:0, y:0, k:1}, fitted = false, SEL = null, LINKING = null, mapHidden = new Set();
+function rMap(){
+  $("#mapFilters").innerHTML = S.settori.map(s => `<button class="chip" data-mf="${s.id}" aria-pressed="${!mapHidden.has(s.id)}"><i style="background:${s.colore}"></i>${esc(s.nome)}</button>`).join("");
+  drawMap();
+  if (!fitted) { fit(); fitted = true; }
+}
+function mapPeople(){ return VP().filter(p => !p.settori.length || p.settori.some(s => !mapHidden.has(s))); }
+function edgePath(a,b){
+  const x1=a.x, y1=a.y, x2=b.x, y2=b.y, mx=(x1+x2)/2, my=(y1+y2)/2, d=Math.hypot(x2-x1,y2-y1);
+  return {d:`M${x1},${y1} Q${mx},${my + Math.min(80, d*.14)} ${x2},${y2}`, lx:mx, ly:my + Math.min(80,d*.14)/2};
+}
+function drawMap(){
+  const ps = mapPeople(), ids = new Set(ps.map(p => p.id));
+  const rs = VR().filter(r => ids.has(r.da) && ids.has(r.a));
+  const q = norm($("#mapSearch").value.trim());
+  const nb = new Set();
+  if (SEL) { nb.add(SEL); rs.forEach(r => { if (r.da===SEL) nb.add(r.a); if (r.a===SEL) nb.add(r.da); }); }
+  $("#gEdges").innerHTML = rs.map(r => {
+    const a = P(r.da), b = P(r.a), e = edgePath(a,b), hot = SEL && (r.da===SEL || r.a===SEL);
+    const lbl = hot ? `<g><rect class="edge-lbl-bg" x="${e.lx-60}" y="${e.ly-11}" width="120" height="20" rx="3"/><text class="edge-lbl" x="${e.lx}" y="${e.ly+4}" text-anchor="middle">${esc(TIPI_REL[r.tipo]||r.tipo)}</text></g>` : "";
+    return `<path class="edge ${SEL&&!hot?"dim":""} ${hot?"hot":""}" d="${e.d}"><title>${esc(a.nome)} — ${esc(TIPI_REL[r.tipo]||r.tipo)} — ${esc(b.nome)}${r.nota?": "+esc(r.nota):""}</title></path>${lbl}`;
+  }).join("");
+  $("#gNodes").innerHTML = ps.map((p,i) => {
+    const s = Sett(p.settori[0]), col = s ? s.colore : "#888", rot = ((i*37)%7 - 3) * .6;
+    const cls = ["node", SEL && !nb.has(p.id) ? "dim" : "", SEL===p.id ? "sel" : "", q && norm(p.nome+" "+p.ruolo+" "+p.citta+" "+p.azienda).includes(q) ? "hit" : "", LINKING===p.id ? "linking" : ""].join(" ");
+    const nm = p.nome.length > 18 ? p.nome.slice(0,17)+"…" : p.nome;
+    const sub = [p.ruolo, p.citta].filter(Boolean).join(" · ");
+    const shape = p.tipo === "azienda"
+      ? `<path class="paper" d="M${-NW/2},${-NH/2+8} h40 l8,-8 h${NW-48} v${NH} h${-NW} z" filter="url(#sh)"/>`
+      : `<rect class="paper" x="${-NW/2}" y="${-NH/2}" width="${NW}" height="${NH}" rx="2" filter="url(#sh)"/>`;
+    return `<g class="${cls}" data-node="${p.id}" transform="translate(${p.x},${p.y}) rotate(${rot})" tabindex="0" role="button" aria-label="${esc(p.nome)}">
+      ${shape}<rect x="${-NW/2}" y="${NH/2-4}" width="${NW}" height="4" fill="${col}"/>
+      <circle cx="0" cy="${-NH/2}" r="6.5" fill="${col}" stroke="rgba(0,0,0,.35)"/><circle cx="-2" cy="${-NH/2-2}" r="2" fill="rgba(255,255,255,.7)"/>
+      <text class="nm" x="0" y="-2" text-anchor="middle">${esc(nm)}</text>
+      <text class="sub" x="0" y="15" text-anchor="middle">${esc(sub.length>28?sub.slice(0,27)+"…":sub)}</text></g>`;
+  }).join("");
+  applyView();
+  $("#mapHint").textContent = LINKING === "?" ? "Tocca la prima delle due schede da collegare." : LINKING ? `Ora tocca la seconda scheda da collegare a ${P(LINKING).nome}. Tocca lo sfondo per annullare.` :
+    SEL ? `${P(SEL)?.nome}: ${nb.size-1} collegamenti visibili. Tocca lo sfondo per vedere tutta la rete.` : "Trascina le schede per spostarle. Tocca una scheda per vedere i suoi collegamenti.";
+}
+function applyView(){ $("#vp").setAttribute("transform", `translate(${view.x},${view.y}) scale(${view.k})`); }
+function fit(){
+  const ps = mapPeople(), svg = $("#svg"), W = svg.clientWidth || 800, H = svg.clientHeight || 600;
+  if (!ps.length) return;
+  const xs = ps.map(p=>p.x), ys = ps.map(p=>p.y);
+  const x0 = Math.min(...xs)-NW, x1 = Math.max(...xs)+NW, y0 = Math.min(...ys)-NH*2, y1 = Math.max(...ys)+NH*2;
+  const k = Math.min(1.4, Math.max(.3, Math.min(W/(x1-x0), (H-60)/(y1-y0))));
+  view = {k, x: W/2 - (x0+x1)/2*k, y: (H+50)/2 - (y0+y1)/2*k};
+  applyView();
+}
+function zoom(f, cx, cy){
+  const svg = $("#svg"); cx ??= svg.clientWidth/2; cy ??= svg.clientHeight/2;
+  const k = Math.min(2.5, Math.max(.25, view.k*f)); const r = k/view.k;
+  view.x = cx - (cx-view.x)*r; view.y = cy - (cy-view.y)*r; view.k = k; applyView();
+}
+function setupMap(){
+  const svg = $("#svg");
+  svg.insertAdjacentHTML("afterbegin", `<defs><filter id="sh" x="-20%" y="-20%" width="140%" height="160%"><feDropShadow dx="1" dy="3" stdDeviation="2.5" flood-opacity=".35"/></filter></defs>`);
+  let drag = null;
+  svg.addEventListener("pointerdown", e => {
+    const g = e.target.closest("[data-node]");
+    svg.setPointerCapture(e.pointerId);
+    drag = {id: g?.dataset.node, sx:e.clientX, sy:e.clientY, vx:view.x, vy:view.y, moved:0};
+    if (drag.id) { const p = P(drag.id); drag.px = p.x; drag.py = p.y; } else svg.classList.add("panning");
+  });
+  svg.addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX-drag.sx, dy = e.clientY-drag.sy; drag.moved = Math.max(drag.moved, Math.hypot(dx,dy));
+    if (drag.id) { if (drag.moved < 4 || !canEdit()) return; const p = P(drag.id); p.x = drag.px + dx/view.k; p.y = drag.py + dy/view.k; drawMap(); }
+    else { view.x = drag.vx+dx; view.y = drag.vy+dy; applyView(); }
+  });
+  svg.addEventListener("pointerup", () => {
+    if (!drag) return; svg.classList.remove("panning");
+    const d = drag; drag = null;
+    if (d.id && d.moved >= 4) { if (canEdit()) { P(d.id).posSalvata = true; save(); } return; }
+    if (d.moved >= 4) return;
+    if (!d.id) { SEL = null; LINKING = null; drawMap(); return; }
+    nodeTap(d.id);
+  });
+  svg.addEventListener("keydown", e => { const g = e.target.closest("[data-node]"); if (g && (e.key==="Enter"||e.key===" ")) { e.preventDefault(); nodeTap(g.dataset.node); } });
+  svg.addEventListener("wheel", e => { e.preventDefault(); const r = svg.getBoundingClientRect(); zoom(e.deltaY < 0 ? 1.12 : 1/1.12, e.clientX-r.left, e.clientY-r.top); }, {passive:false});
+  $("#zIn").onclick = () => zoom(1.25); $("#zOut").onclick = () => zoom(1/1.25); $("#zFit").onclick = fit;
+  $("#mapSearch").oninput = drawMap;
+  $("#btnLink").onclick = () => { if (!guard()) return; LINKING = SEL || "?"; if (LINKING === "?") toast("Tocca la prima scheda, poi la seconda."); drawMap(); };
+  $("#btnNewP").onclick = () => formPerson();
+  $("#mapFilters").onclick = e => { const b = e.target.closest("[data-mf]"); if (!b) return; const id = b.dataset.mf; mapHidden.has(id) ? mapHidden.delete(id) : mapHidden.add(id); rMap(); };
+}
+function nodeTap(id){
+  if (LINKING === "?") { LINKING = id; drawMap(); return; }
+  if (LINKING && LINKING !== id) { const a = LINKING; LINKING = null; formRelation(a, id); return; }
+  SEL = SEL === id ? null : id; drawMap(); if (SEL) openDrawer(id);
+}
+
+/* ================= rubrica ================= */
+let rubQ = "", rubS = "";
+function rRubrica(){
+  const q = norm(rubQ);
+  const ps = VP().filter(p => (!rubS || p.settori.includes(rubS)) && (!q || norm([p.nome,p.ruolo,p.azienda,p.citta,p.email,p.telefono,(p.tag||[]).join(" ")].join(" ")).includes(q))).sort((a,b) => a.nome.localeCompare(b.nome));
+  const v = $("#v-rubrica");
+  if (!v.querySelector(".wrap")) {
+    v.innerHTML = `<div class="wrap"><div class="row" style="justify-content:space-between"><h2>Rubrica</h2><div class="row"><button class="btn" data-act="export">Esporta</button><button class="btn" data-act="import">Importa</button><button class="btn pri" data-act="newP">Nuovo contatto</button></div></div>
+      <div class="row"><input type="search" id="rubQ" placeholder="Cerca per nome, città, ruolo, telefono" style="flex:1;min-width:200px"><select id="rubS" style="width:auto"><option value="">Tutti i settori</option>${S.settori.map(s=>`<option value="${s.id}">${esc(s.nome)}</option>`).join("")}</select></div>
+      <div class="tbl-wrap"><table><thead><tr><th>Nome</th><th>Ruolo</th><th>Settori</th><th>Contatti</th><th>Città</th><th>Ultimo contatto</th><th>Visibilità</th></tr></thead><tbody id="rubBody"></tbody></table></div>
+      <p class="muted" id="rubCount"></p></div>`;
+    $("#rubQ").oninput = e => { rubQ = e.target.value; rRubrica(); };
+    $("#rubS").onchange = e => { rubS = e.target.value; rRubrica(); };
+  }
+  $("#rubBody").innerHTML = ps.map(p => {
+    const ds = daysSince(p.ultimoContatto);
+    return `<tr data-open="${p.id}"><td><b style="font-weight:600">${esc(p.nome)}</b>${p.tipo==="azienda"?' <span class="pill neu">azienda</span>':""}</td><td>${esc(p.ruolo)}${p.azienda?`<div class="muted">${esc(p.azienda)}</div>`:""}</td><td>${p.settori.map(sChip).join(" ")}</td><td class="mono" style="font-size:12px">${esc(p.telefono)}<div class="muted">${esc(p.email)}</div></td><td>${esc(p.citta)}</td><td><span class="pill ${ds>=90?"bad":ds>=30?"warn":"ok"}">${p.ultimoContatto?ds+" gg fa":"mai"}</span></td><td class="muted" style="font-size:12px">${{privato:"Privata",settore:"Settore",tutti:"Tutti"}[p.visibilita]}</td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="muted">Nessun contatto trovato.</td></tr>`;
+  $("#rubCount").textContent = `${ps.length} contatti visibili su ${S.persone.length} totali nel CRM.`;
+}
+
+/* ================= trattative ================= */
+function rDeals(){
+  const ts = VT();
+  $("#v-trattative").innerHTML = `<div class="wrap"><div class="row" style="justify-content:space-between"><h2>Trattative</h2><button class="btn pri" data-act="newT">Nuova trattativa</button></div>
+    <div class="kanban">${FASI.map(f => { const l = ts.filter(t => t.fase===f); return `<div class="col"><header><b>${f}</b><span class="mono muted" style="font-size:12px">${l.length} · ${eur(l.reduce((s,t)=>s+(+t.importo||0),0))}</span></header>
+    ${l.map(t => `<div class="deal"><div style="font-weight:600">${esc(t.titolo)}</div><div class="amt">${eur(t.importo)}</div><div style="font-size:12px" class="muted">${pLink(t.personaId)} · ${esc(U(t.responsabile)?.nome||"")}</div><div class="row" style="justify-content:space-between">${sChip(t.settore)}<span class="when mono muted" style="font-size:12px">${t.scadenza?"entro "+fmtD(t.scadenza):""}</span></div>
+      <select data-fase="${t.id}" aria-label="Fase" ${canEdit()?"":"disabled"}>${FASI.map(x=>`<option ${x===t.fase?"selected":""}>${x}</option>`).join("")}</select></div>`).join("") || '<span class="muted" style="font-size:12px">Nessuna</span>'}</div>`; }).join("")}</div></div>`;
+}
+
+/* ================= agenda ================= */
+function rAgenda(){
+  const as = VA().filter(a => a.tipo !== "nota").sort((a,b) => (a.data+(a.ora||"99")).localeCompare(b.data+(b.ora||"99")));
+  const groups = [["Scadute", a => !a.fatto && a.data < TODAY()],["Oggi", a => a.data === TODAY()],["Domani", a => a.data === addDays(1)],["Prossimi giorni", a => a.data > addDays(1)],["Completate in passato", a => a.fatto && a.data < TODAY()]];
+  $("#v-agenda").innerHTML = `<div class="wrap"><div class="row" style="justify-content:space-between"><h2>Agenda e promemoria</h2><button class="btn pri" data-act="newA">Nuova attività</button></div>
+    ${groups.map(([n,f]) => { const l = as.filter(f); return l.length ? `<div class="day"><h3>${n}</h3>${l.map(a => `<div class="act ${a.fatto?"done":""}"><input type="checkbox" data-done="${a.id}" ${a.fatto?"checked":""} aria-label="Segna come fatto" ${canEdit()?"":"disabled"}><div class="t"><div>${esc(a.testo)}</div><div class="muted" style="font-size:12px">${TIPI_ATT[a.tipo]}${a.personaId?" · "+pLink(a.personaId):""} · assegnata a ${esc(U(a.assegnatoA)?.nome||"")}${a.condivisa?"":" · privata"}</div></div><span class="when mono muted" style="font-size:12px">${fmtD(a.data)}${a.ora?" · "+a.ora:""}</span></div>`).join("")}</div>` : ""; }).join("")}
+    <p class="note-demo">I promemoria arrivano su Telegram a chi è assegnata l'attività, ogni 15 minuti dalle 7 alle 21.</p></div>`;
+}
+
+/* ================= permessi ================= */
+function rPerm(){
+  const adm = isAdmin();
+  $("#v-permessi").innerHTML = `<div class="wrap"><h2>Utenti e permessi</h2>
+    <p class="muted" style="max-width:68ch">Sistema ibrido: l'amministratore vede tutta la mappa. Gli altri vedono i contatti condivisi con tutti, quelli dei propri settori e quelli condivisi con loro personalmente. Un collegamento compare solo se la persona vede entrambe le schede. I permessi sono controllati dal database: valgono anche per Telegram.</p>
+    <div class="tbl-wrap"><table><thead><tr><th>Utente</th><th>Ruolo</th><th>Settori</th><th>Vede</th></tr></thead><tbody>
+    ${S.utenti.map(u => `<tr><td><b style="font-weight:600">${esc(u.nome)}</b>${u.email?`<div class="muted" style="font-size:12px">${esc(u.email)}</div>`:""}</td>
+      <td>${adm && u.id!==ME ? `<select data-role="${u.id}">${Object.entries(RUOLI).map(([k,l])=>`<option value="${k}" ${k===u.ruolo?"selected":""}>${l}</option>`).join("")}</select>` : RUOLI[u.ruolo]}</td>
+      <td>${S.settori.map(s => adm && u.id!==ME ? `<label style="display:inline-flex;gap:4px;align-items:center;margin-right:10px;font-size:13px"><input type="checkbox" data-us="${u.id}|${s.id}" ${u.settori.includes(s.id)?"checked":""}>${esc(s.nome)}</label>` : (u.settori.includes(s.id)?sChip(s.id)+" ":"")).join("")}</td>
+      <td class="mono" style="font-size:12px">${S.persone.filter(p=>seeP(p,u)).length} contatti · ${S.relazioni.filter(r=>seeR(r,u)).length} collegamenti · ${S.trattative.filter(t=>seeT(t,u)).length} trattative</td></tr>`).join("")}
+    </tbody></table></div>
+    ${adm ? `<div class="row"><button class="btn" data-act="newU">Aggiungi utente</button></div>` : `<p class="note-demo">Solo l'amministratore può cambiare ruoli e settori.</p>`}
+    <div class="panel stack"><div class="row" style="justify-content:space-between"><h3>Settori</h3>${adm?`<button class="btn sm" data-act="newS">Aggiungi settore</button>`:""}</div>
+      <ul class="list">${S.settori.map(st => { const n = S.persone.filter(p=>p.settori.includes(st.id)).length, nt = S.trattative.filter(t=>t.settore===st.id).length;
+        return `<li><div class="t row" style="gap:10px">${adm?`<input type="color" value="${st.colore}" data-sc="${st.id}" aria-label="Colore di ${esc(st.nome)}" style="width:34px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px;background:none">`:`<i style="width:12px;height:12px;border-radius:50%;background:${st.colore}"></i>`}<b style="font-weight:600">${esc(st.nome)}</b><span class="muted" style="font-size:12px">${n} contatti · ${nt} trattative</span></div>${adm?`<button class="btn ghost sm" data-act="editS" data-s="${st.id}">Rinomina</button><button class="btn ghost sm" data-act="delS" data-s="${st.id}" ${nt?"disabled title=\"Ha trattative collegate\"":""}>Elimina</button>`:""}</li>`; }).join("")}</ul>
+      ${adm?`<p class="muted" style="font-size:12px;margin:0">Un settore con trattative non si può eliminare. Eliminandolo, i contatti restano e perdono solo quel settore.</p>`:""}</div>
+    <div class="panel stack"><h3>Cosa può fare ogni ruolo</h3><ul class="list">
+      <li><div class="t"><b>Amministratore</b> · vede e modifica tutto, gestisce utenti e autorizzazioni</div></li>
+      <li><div class="t"><b>Responsabile</b> · gestisce contatti, trattative e agenda dei settori assegnati</div></li>
+      <li><div class="t"><b>Collaboratore</b> · modifica solo i contatti e le attività che può vedere</div></li>
+      <li><div class="t"><b>Sola lettura</b> · consulta senza modificare, anche a voce</div></li></ul></div>
+    <div class="panel stack"><h3>Copia dei dati</h3><div class="row"><button class="btn" data-act="export">Esporta in JSON</button></div></div></div>`;
+}
+function rLog(){
+  $("#v-registro").innerHTML = `<div class="wrap"><h2>Registro delle modifiche</h2><p class="muted">Ogni modifica, anche quelle fatte a voce, viene registrata con l'autore.</p>
+  <div class="tbl-wrap"><table><thead><tr><th>Quando</th><th>Chi</th><th>Modifica</th><th>Come</th></tr></thead><tbody>
+  ${S.registro.map(l => `<tr><td class="mono" style="font-size:12px;white-space:nowrap">${new Date(l.quando).toLocaleString("it-IT")}</td><td>${esc(U(l.chi)?.nome||"")}</td><td>${esc(l.cosa)}</td><td>${l.via==="voce"?'<span class="pill ok">voce</span>':`<span class="pill neu">${esc(l.via)}</span>`}</td></tr>`).join("")}
+  </tbody></table></div></div>`;
+}
+
+/* ================= drawer contatto ================= */
+let DRAWER = null;
+function openDrawer(id, refresh){
+  const p = P(id); if (!p || !seeP(p)) { closeDrawer(); return; }
+  DRAWER = id;
+  const rels = VR().filter(r => r.da===id || r.a===id);
+  const acts = VA().filter(a => a.personaId===id).sort((a,b)=>b.data.localeCompare(a.data));
+  const deals = VT().filter(t => t.personaId===id);
+  const d = $("#drawer");
+  d.innerHTML = `<div class="hd"><div style="flex:1;min-width:0"><div class="nm">${esc(p.nome)}</div><div class="muted">${esc(p.ruolo)}${p.azienda?" · "+esc(p.azienda):""}</div><div class="row" style="margin-top:8px;gap:6px">${p.settori.map(sChip).join("")}${(p.tag||[]).map(t=>`<span class="chip">#${esc(t)}</span>`).join("")}</div></div><button class="btn ghost sm" data-act="closeDrawer" aria-label="Chiudi">✕</button></div>
+  <div class="bd">
+    <div class="row"><button class="btn sm" data-act="call" data-p="${id}">Registra chiamata</button><button class="btn sm" data-act="newA" data-p="${id}">Promemoria</button><button class="btn sm" data-act="note" data-p="${id}">Nota</button><button class="btn sm" data-act="edit" data-p="${id}">Modifica</button></div>
+    <dl class="kv"><dt>Telefono</dt><dd class="mono">${esc(p.telefono)||"—"}</dd><dt>Email</dt><dd>${esc(p.email)||"—"}</dd><dt>Città</dt><dd>${esc(p.citta)||"—"}</dd><dt>Ultimo contatto</dt><dd>${p.ultimoContatto?fmtD(p.ultimoContatto)+` (${daysSince(p.ultimoContatto)} giorni fa)`:"mai"}</dd><dt>Visibilità</dt><dd>${VIS[p.visibilita]}${(p.condivisiCon||[]).length?"<br>Condivisa anche con "+p.condivisiCon.map(u=>esc(U(u)?.nome)).join(", "):""}</dd></dl>
+    <div class="stack"><div class="row" style="justify-content:space-between"><h3>Collegamenti · ${rels.length}</h3><button class="btn sm" data-act="link" data-p="${id}">Collega</button></div>
+      ${rels.length?`<ul class="list">${rels.map(r => { const o = r.da===id ? r.a : r.da; return `<li><div class="t">${pLink(o)}<div class="muted" style="font-size:12px">${esc(TIPI_REL[r.tipo]||r.tipo)}${r.da!==id&&r.tipo==="presentazione"?" (ha presentato "+esc(p.nome)+")":""}${r.nota?" · "+esc(r.nota):""}${r.visibilita==="privato"?' · <span class="pill warn">privato</span>':""}</div></div>${canEdit()?`<button class="btn ghost sm" data-delrel="${r.id}" aria-label="Elimina collegamento">✕</button>`:""}</li>`; }).join("")}</ul>`:'<p class="muted">Nessun collegamento visibile.</p>'}</div>
+    <div class="stack"><h3>Trattative · ${deals.length}</h3>${deals.length?`<ul class="list">${deals.map(t=>`<li><div class="t">${esc(t.titolo)}<div class="muted" style="font-size:12px">${t.fase} · ${esc(U(t.responsabile)?.nome||"")}</div></div><span class="mono">${eur(t.importo)}</span></li>`).join("")}</ul>`:'<p class="muted">Nessuna trattativa visibile.</p>'}</div>
+    <div class="stack"><h3>Cronologia</h3>${acts.length?`<ul class="list">${acts.map(a=>`<li><div class="t">${esc(a.testo)}<div class="muted" style="font-size:12px">${TIPI_ATT[a.tipo]} · ${esc(U(a.assegnatoA)?.nome||"")}${a.fatto?" · fatto":""}</div></div><span class="when">${fmtD(a.data)}</span></li>`).join("")}</ul>`:'<p class="muted">Ancora niente.</p>'}</div>
+  </div>`;
+  d.hidden = false;
+  if (!refresh) d.querySelector("button")?.focus();
+}
+function closeDrawer(){ DRAWER = null; $("#drawer").hidden = true; }
+
+/* ================= form ================= */
+function openForm(title, fields, onSubmit, submitLabel="Salva"){
+  const sc = document.createElement("div"); sc.className = "scrim";
+  sc.innerHTML = `<form class="modal" novalidate><h2>${esc(title)}</h2><div class="form">${fields.map(f => {
+    const id = "f_"+f.id, full = f.full ? "full" : "";
+    let inp;
+    if (f.type === "select") inp = `<select id="${id}">${f.options.map(([v,l]) => `<option value="${esc(v)}" ${String(v)===String(f.value??"")?"selected":""}>${esc(l)}</option>`).join("")}</select>`;
+    else if (f.type === "checks") inp = `<div class="row" id="${id}">${f.options.map(([v,l]) => `<label style="display:inline-flex;gap:5px;align-items:center;color:var(--ink);font-weight:400"><input type="checkbox" value="${esc(v)}" ${(f.value||[]).includes(v)?"checked":""}>${esc(l)}</label>`).join("")}</div>`;
+    else if (f.type === "textarea") inp = `<textarea id="${id}" rows="3">${esc(f.value||"")}</textarea>`;
+    else inp = `<input id="${id}" type="${f.type||"text"}" value="${esc(f.value??"")}" ${f.required?"required":""}>`;
+    return `<label class="f ${full}" for="${id}">${esc(f.label)}${inp}</label>`;
+  }).join("")}</div><p class="muted" id="formErr" style="margin:0"></p><div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-x>Annulla</button><button class="btn pri">${esc(submitLabel)}</button></div></form>`;
+  document.body.append(sc);
+  const close = () => sc.remove();
+  sc.querySelector("[data-x]").onclick = close;
+  sc.addEventListener("click", e => { if (e.target === sc) close(); });
+  sc.addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+  sc.querySelector("form").addEventListener("submit", e => {
+    e.preventDefault();
+    const v = {};
+    fields.forEach(f => { const el = sc.querySelector("#f_"+f.id); v[f.id] = f.type === "checks" ? [...el.querySelectorAll("input:checked")].map(i=>i.value) : el.value.trim(); });
+    const miss = fields.find(f => f.required && !v[f.id]);
+    if (miss) { sc.querySelector("#formErr").textContent = `Compila il campo «${miss.label}».`; return; }
+    const err = onSubmit(v); if (err) { sc.querySelector("#formErr").textContent = err; return; }
+    close(); save(); render();
+  });
+  sc.querySelector("input,select,textarea")?.focus();
+}
+const optP = () => [["","—"], ...VP().sort((a,b)=>a.nome.localeCompare(b.nome)).map(p=>[p.id,p.nome])];
+const optU = () => S.utenti.map(u=>[u.id,u.nome]);
+const optS = () => S.settori.map(s=>[s.id,s.nome]);
+const COLORI = ["#1f5f99","#7a4a9e","#2f7d5b","#a06a12","#b3261e","#0f7c86","#5b6b2f","#9c3d6e"];
+function formSettore(id){
+  if (!isAdmin()) { toast("Solo l'amministratore gestisce i settori."); return; }
+  const st = id ? Sett(id) : {nome:"", colore: COLORI.find(c => !S.settori.some(s => s.colore === c)) || COLORI[0]};
+  openForm(id ? "Rinomina settore" : "Nuovo settore", [
+    {id:"nome", label:"Nome del settore", value:st.nome, required:true, full:true},
+    {id:"colore", label:"Colore sulla mappa", type:"color", value:st.colore}
+  ], v => {
+    if (S.settori.some(s => s !== st && norm(s.nome) === norm(v.nome))) return "Esiste già un settore con questo nome.";
+    if (id) { log(`Settore ${st.nome} rinominato in ${v.nome}`); Object.assign(st, v); }
+    else { const n = {id:uid("s"), ...v}; S.settori.push(n); S.utenti.filter(u => u.ruolo === "admin").forEach(u => u.settori.push(n.id)); log(`Nuovo settore: ${v.nome}`); }
+    $("#v-rubrica").innerHTML = "";
+  }, id ? "Salva" : "Aggiungi");
+}
+function formUtente(){
+  if (!isAdmin()) return;
+  openForm("Nuovo utente", [
+    {id:"nome", label:"Nome", required:true},
+    {id:"email", label:"Email", type:"email", required:true},
+    {id:"ruolo", label:"Ruolo", type:"select", options:Object.entries(RUOLI), value:"collaboratore"},
+    {id:"settori", label:"Settori", type:"checks", options:optS(), value:[], full:true}
+  ], v => {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v.email)) return "Controlla l'indirizzo email.";
+    if (S.utenti.some(u => (u.email||"").toLowerCase() === v.email.toLowerCase())) return "Questa email è già tra gli utenti.";
+    (async () => {
+      const {data:{session}} = await sb.auth.getSession();
+      const r = await (await fetch(BOT + "?invita=1", {method:"POST", headers:{Authorization:"Bearer "+session.access_token, "Content-Type":"application/json"}, body:JSON.stringify({org:ORG, ...v})})).json().catch(() => ({errore:"rete"}));
+      if (!r.ok) { toast(r.errore || "Utente non creato."); return; }
+      await loadDb(); render();
+      openForm("Utente creato", [{id:"info", label:`Comunica a ${v.nome} la password temporanea, da cambiare al primo accesso con il pulsante «Password»`, value:r.password, full:true}], () => {}, "Ho preso nota");
+    })();
+  }, "Aggiungi");
+}
+
+function formPerson(id){
+  if (!guard()) return;
+  const p = id ? P(id) : {tipo:"persona", settori: me().ruolo==="admin"?[]:[me().settori[0]].filter(Boolean), visibilita: isAdmin()?"privato":"settore", condivisiCon:[]};
+  openForm(id ? "Modifica contatto" : "Nuovo contatto", [
+    {id:"nome", label:"Nome e cognome o ragione sociale", value:p.nome, required:true, full:true},
+    {id:"tipo", label:"Tipo", type:"select", options:[["persona","Persona"],["azienda","Azienda"]], value:p.tipo},
+    {id:"ruolo", label:"Ruolo o attività", value:p.ruolo},
+    {id:"azienda", label:"Azienda", value:p.azienda},
+    {id:"citta", label:"Città", value:p.citta},
+    {id:"telefono", label:"Telefono", type:"tel", value:p.telefono},
+    {id:"email", label:"Email", type:"email", value:p.email},
+    {id:"settori", label:"Settori", type:"checks", options:optS(), value:p.settori, full:true},
+    {id:"visibilita", label:"Chi può vedere questa scheda", type:"select", options:Object.entries(VIS), value:p.visibilita, full:true},
+    {id:"condivisiCon", label:"Condividi anche con", type:"checks", options:S.utenti.filter(u=>u.ruolo!=="admin").map(u=>[u.id,u.nome]), value:p.condivisiCon, full:true},
+    {id:"tag", label:"Etichette (separate da virgola)", value:(p.tag||[]).join(", "), full:true}
+  ], v => {
+    v.tag = v.tag ? v.tag.split(",").map(s=>s.trim()).filter(Boolean) : [];
+    if (id) { Object.assign(p, v); log(`Modificato il contatto ${p.nome}`); }
+    else { const n = newPerson(v); log(`Creato il contatto ${n.nome}`); }
+  });
+}
+function newPerson(v){
+  const vis = VP(), cx = vis.length ? vis.reduce((s,p)=>s+p.x,0)/vis.length : 500, cy = vis.length ? vis.reduce((s,p)=>s+p.y,0)/vis.length : 350;
+  const a = Math.random()*Math.PI*2, r = 260 + Math.random()*140;
+  const p = Object.assign({id:uid("p"), tipo:"persona", ruolo:"", azienda:"", settori:[], telefono:"", email:"", citta:"", tag:[], visibilita:isAdmin()?"privato":"settore", ultimoContatto:"", x:cx+Math.cos(a)*r, y:cy+Math.sin(a)*r*.7, posSalvata:true, creatoDa:ME, condivisiCon:[]}, v);
+  S.persone.push(p); return p;
+}
+function formRelation(a, b){
+  if (!guard()) return;
+  openForm("Nuovo collegamento", [
+    {id:"da", label:"Da", type:"select", options:optP(), value:a, required:true},
+    {id:"a", label:"A", type:"select", options:optP(), value:b, required:true},
+    {id:"tipo", label:"Tipo di rapporto", type:"select", options:Object.entries(TIPI_REL), value:"conoscenza"},
+    {id:"visibilita", label:"Visibilità del collegamento", type:"select", options:[["tutti","Visibile a chi vede le due schede"],["privato","Privato"]], value:"tutti"},
+    {id:"nota", label:"Nota", full:true}
+  ], v => { if (v.da === v.a) return "Scegli due persone diverse."; S.relazioni.push({id:uid("r"), ...v, creatoDa:ME}); log(`Collegati ${P(v.da).nome} e ${P(v.a).nome} (${TIPI_REL[v.tipo]})`); SEL = v.da; }, "Collega");
+}
+function formActivity(pid, tipo){
+  if (!guard()) return;
+  openForm(tipo==="chiamata" ? "Registra chiamata" : "Nuova attività", [
+    {id:"tipo", label:"Tipo", type:"select", options:Object.entries(TIPI_ATT), value:tipo||"promemoria"},
+    {id:"personaId", label:"Persona", type:"select", options:optP(), value:pid||""},
+    {id:"data", label:"Data", type:"date", value:TODAY(), required:true},
+    {id:"ora", label:"Ora", type:"time", value:""},
+    {id:"assegnatoA", label:"Assegnata a", type:"select", options:optU(), value:ME},
+    {id:"condivisa", label:"Visibilità", type:"select", options:[["1","Condivisa"],["","Solo per me e l'assegnatario"]], value:"1"},
+    {id:"testo", label:"Descrizione", type:"textarea", full:true, required:true}
+  ], v => {
+    const done = v.tipo === "chiamata" && v.data <= TODAY() || v.tipo === "nota" || v.tipo === "messaggio";
+    S.attivita.push({id:uid("a"), ...v, condivisa:!!v.condivisa, fatto:done});
+    if (done && v.personaId) P(v.personaId).ultimoContatto = v.data;
+    log(`${TIPI_ATT[v.tipo]}: ${v.testo}${v.personaId?" ("+P(v.personaId).nome+")":""}`);
+  });
+}
+function formDeal(){
+  if (!guard()) return;
+  openForm("Nuova trattativa", [
+    {id:"titolo", label:"Titolo", required:true, full:true},
+    {id:"personaId", label:"Cliente", type:"select", options:optP()},
+    {id:"settore", label:"Settore", type:"select", options:optS(), value:me().settori[0]},
+    {id:"importo", label:"Importo in euro", type:"number"},
+    {id:"fase", label:"Fase", type:"select", options:FASI.map(f=>[f,f]), value:"Contatto"},
+    {id:"responsabile", label:"Responsabile", type:"select", options:optU(), value:ME},
+    {id:"scadenza", label:"Chiusura prevista", type:"date"}
+  ], v => { S.trattative.push({id:uid("t"), ...v, importo:+v.importo||0}); log(`Nuova trattativa: ${v.titolo}`); });
+}
+
+/* ================= export / import ================= */
+async function doExport(){
+  const json = JSON.stringify(S, null, 2);
+  try { const dl = await window.claude?.use?.("downloads"); if (dl) { await dl.save({filename:"network-crm-"+TODAY()+".json", data:json}); return; } } catch(e){ if (e?.code === "cancelled" || e?.code === "declined") return; }
+  try { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([json],{type:"application/json"})); a.download = "network-crm-"+TODAY()+".json"; a.click(); } catch(e){}
+  try { await navigator.clipboard.writeText(json); toast("Dati copiati negli appunti in formato JSON."); } catch(e){}
+}
+
+/* ================= eventi globali ================= */
+document.addEventListener("click", e => {
+  const t = e.target;
+  const tab = t.closest("[data-tab]"); if (tab) { go(tab.dataset.tab); return; }
+  const op = t.closest("[data-open]"); if (op) { if (TAB==="mappa") { SEL = op.dataset.open; drawMap(); } openDrawer(op.dataset.open); return; }
+  const dr = t.closest("[data-delrel]"); if (dr) { if (!guard()) return; const r = S.relazioni.find(x=>x.id===dr.dataset.delrel); S.relazioni = S.relazioni.filter(x=>x!==r); log(`Eliminato il collegamento tra ${P(r.da).nome} e ${P(r.a).nome}`); save(); render(); return; }
+  const b = t.closest("[data-act]"); if (!b) return;
+  const pid = b.dataset.p;
+  ({
+    newP: () => formPerson(), newA: () => formActivity(pid), newT: formDeal, voice: openVoice,
+    call: () => formActivity(pid, "chiamata"), note: () => formActivity(pid, "nota"), edit: () => formPerson(pid),
+    link: () => formRelation(pid, ""), closeDrawer, export: doExport,
+    newS: () => formSettore(), editS: () => formSettore(b.dataset.s), newU: formUtente,
+    delS: () => { if (!isAdmin()) return; const st = Sett(b.dataset.s); if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Conferma"; b.classList.add("pri"); return; }
+      S.settori = S.settori.filter(x => x !== st); S.persone.forEach(p => p.settori = p.settori.filter(x => x !== st.id)); S.utenti.forEach(u => u.settori = u.settori.filter(x => x !== st.id)); mapHidden.delete(st.id);
+      log(`Eliminato il settore ${st.nome}`); save(); $("#v-rubrica").innerHTML = ""; render(); },
+    refresh: async () => { await loadDb(); render(); toast("Dati aggiornati."); },
+    logout: async () => { await sb.auth.signOut(); location.reload(); },
+    pwd: cambiaPassword
+  })[b.dataset.act]?.();
+});
+document.addEventListener("change", e => {
+  const t = e.target;
+  if (t.dataset.done) { if (!guard()) { t.checked = !t.checked; return; } const a = S.attivita.find(x=>x.id===t.dataset.done); a.fatto = t.checked; if (a.fatto && a.personaId && ["chiamata","appuntamento"].includes(a.tipo)) P(a.personaId).ultimoContatto = TODAY(); log(`${a.fatto?"Completata":"Riaperta"}: ${a.testo}`); save(); render(); }
+  if (t.dataset.fase) { const d = S.trattative.find(x=>x.id===t.dataset.fase); d.fase = t.value; log(`Trattativa «${d.titolo}» spostata in ${d.fase}`); save(); render(); }
+  if (t.dataset.role) { U(t.dataset.role).ruolo = t.value; log(`Ruolo di ${U(t.dataset.role).nome}: ${RUOLI[t.value]}`); save(); render(); }
+  if (t.dataset.sc) { if (!isAdmin()) return; const st = Sett(t.dataset.sc); st.colore = t.value; log(`Nuovo colore per il settore ${st.nome}`); save(); render(); }
+  if (t.dataset.us) { const [u,s] = t.dataset.us.split("|"), us = U(u); us.settori = t.checked ? [...new Set([...us.settori, s])] : us.settori.filter(x=>x!==s); log(`Settori di ${us.nome}: ${us.settori.map(x=>Sett(x).nome).join(", ")||"nessuno"}`); save(); render(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (!$("#voice").hidden) closeVoice(); else if (!$("#drawer").hidden) closeDrawer(); } });
+
+/* ================= linguaggio naturale ================= */
+const norm = s => String(s||"").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[’']/g," ").replace(/\s+/g," ").trim();
+const NUM = {un:1,uno:1,una:1,due:2,tre:3,quattro:4,cinque:5,sei:6,sette:7,otto:8,nove:9,dieci:10,undici:11,dodici:12,quindici:15,venti:20,trenta:30};
+const toNum = w => /^\d+$/.test(w) ? +w : NUM[w];
+const MESI = ["gennaio","febbraio","marzo","aprile","maggio","giugno","luglio","agosto","settembre","ottobre","novembre","dicembre"];
+const GIORNI = ["domenica","lunedi","martedi","mercoledi","giovedi","venerdi","sabato"];
+
+function parseWhen(t){
+  let date = null, ora = "";
+  const n = norm(t);
+  let m;
+  if (/\bdopodomani\b/.test(n)) date = addDays(2);
+  else if (/\bdomani\b/.test(n)) date = addDays(1);
+  else if (/\boggi\b|\bstasera\b|\bstamattina\b/.test(n)) date = TODAY();
+  if (!date && (m = n.match(/\btra (\d+|un|uno|una|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|quindici|venti|trenta) (giorn[oi]|settiman[ae]|mes[ei])\b/))) {
+    const k = toNum(m[1]); const u = m[2][0];
+    if (u === "g") date = addDays(k);
+    else if (u === "s") date = addDays(k*7);
+    else { const d = new Date(); d.setMonth(d.getMonth()+k); date = iso(d); }
+  }
+  if (!date && /\btra una settimana\b|\bsettimana prossima\b/.test(n)) date = addDays(7);
+  if (!date && (m = n.match(/\b(\d{1,2})(?: |\/|-)(gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre|\d{1,2})(?:(?: |\/|-)(\d{4}))?\b/))) {
+    const day = +m[1], mon = /\d/.test(m[2]) ? +m[2]-1 : MESI.indexOf(m[2]);
+    if (day >= 1 && day <= 31 && mon >= 0 && mon <= 11) {
+      const now = new Date(); let y = m[3] ? +m[3] : now.getFullYear();
+      let d = new Date(y, mon, day, 12); if (!m[3] && iso(d) < TODAY()) d = new Date(y+1, mon, day, 12);
+      date = iso(d);
+    }
+  }
+  if (!date && (m = n.match(/\b(lunedi|martedi|mercoledi|giovedi|venerdi|sabato|domenica)\b/))) {
+    const target = GIORNI.indexOf(m[1]), d = new Date(); let diff = (target - d.getDay() + 7) % 7; if (diff === 0) diff = 7; date = addDays(diff);
+  }
+  if ((m = n.match(/\b(?:alle|ore|per le|verso le)(?: ore)? (\d{1,2})(?:[:.](\d{2})| e (mezza|mezzo|un quarto|quarto))?\b/))) {
+    let h = +m[1], mi = m[2] ? +m[2] : m[3] ? (m[3].includes("quarto") ? 15 : 30) : 0;
+    if (h < 12 && /pomeriggio|sera\b|stasera/.test(n) && h <= 11) h += 12;
+    else if (h >= 1 && h <= 7 && !/mattin/.test(n)) h += 12;
+    if (h <= 23 && mi <= 59) ora = String(h).padStart(2,"0")+":"+String(mi).padStart(2,"0");
+  } else if (/\bmezzogiorno\b/.test(n)) ora = "12:00";
+  return {date, ora};
+}
+function parseAmount(t){
+  const n = norm(t).replace(/(\d)\.(\d{3})/g,"$1$2");
+  let m = n.match(/(\d+(?:[.,]\d+)?)\s*(milioni|milione|mln|mila|k|euro|€)/);
+  if (m) { let v = parseFloat(m[1].replace(",",".")); if (/^mil(ion|n)/.test(m[2])) v *= 1e6; else if (m[2]==="mila"||m[2]==="k") v *= 1e3; return Math.round(v); }
+  m = n.match(/\b(un|uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci)\s+(milioni|milione|mila)\b/);
+  if (m) return toNum(m[1]) * (m[2]==="mila" ? 1e3 : 1e6);
+  return null;
+}
+/* persone citate nel testo: nome completo, cognome o nome di battesimo se univoci */
+function mentions(text, pool = VP()){
+  const n = " " + norm(text).replace(/[^a-z0-9 ]/g," ") + " ";
+  const hits = [];
+  for (const p of pool) {
+    const full = norm(p.nome).replace(/[^a-z0-9 ]/g," ");
+    let i = n.indexOf(" "+full+" ");
+    if (i >= 0) { hits.push({p, i, len:full.length}); continue; }
+    const parts = full.split(" ").filter(w => w.length > 2);
+    for (const w of parts) {
+      const same = pool.filter(q => norm(q.nome).split(" ").includes(w)).length;
+      const j = n.indexOf(" "+w+" ");
+      if (same === 1 && j >= 0) { hits.push({p, i:j, len:w.length}); break; }
+    }
+  }
+  hits.sort((a,b) => a.i - b.i || b.len - a.len);
+  const out = []; for (const h of hits) if (!out.some(o => o.p === h.p || (h.i >= o.i && h.i < o.i + o.len))) out.push(h);
+  return out.map(h => h.p);
+}
+/* nomi propri scritti con l'iniziale maiuscola che non sono ancora nel CRM */
+function newNames(text){
+  const known = VP().map(p => norm(p.nome));
+  const stop = new Set(["Ho","Ha","Il","La","Lo","Le","Gli","Un","Una","Nuovo","Nuova","Aggiungi","Crea","Inserisci","Collega","Ricordami","Richiama","Chiama","Domani","Oggi","Lunedì","Martedì","Mercoledì","Giovedì","Venerdì","Sabato","Domenica","Nota","Appuntamento","Promemoria","Trattativa","Sposta","Segna","Chi","Cosa","E","Poi","Per","Con","Settore","Nautica","Immobiliare","Fornitori","Personale","Mi","Ci","Si","Al","Del","Della","Nel","Nella","Riva","Milano","Genova","Roma","Como","Monza","Torino"]);
+  const words = text.replace(/[.,;:!?«»"()]/g," ").split(/\s+/).filter(Boolean);
+  const out = []; let cur = [];
+  const flush = () => { if (cur.length >= 2) { const nm = cur.join(" "); if (!known.includes(norm(nm)) && !mentions(nm).length) out.push(nm); } cur = []; };
+  words.forEach((w,i) => { if (/^[A-ZÀ-Ý][a-zà-ÿ'’]+$/.test(w) && !(stop.has(w) && !cur.length)) cur.push(w); else flush(); if (cur.length === 3) flush(); });
+  flush();
+  return out;
+}
+function relType(n){
+  if (/presentat|presentato|presentata/.test(n)) return "presentazione";
+  if (/\bamic[oiae]\b|\bamiche\b|\bamici\b|amicizia/.test(n)) return "amicizia";
+  if (/fratell|sorell|cugin|moglie|marito|figli|padre|madre|parent|zio|zia|cognat/.test(n)) return "parentela";
+  if (/\bsoci[oa]?\b/.test(n)) return "socio";
+  if (/fornitor|fornisce/.test(n)) return "fornitore";
+  if (/cliente di|e cliente/.test(n)) return "cliente";
+  if (/lavora(no)? (con|insieme|per)|collabora|colleg[hi]i? di lavoro|collega di|stesso ufficio/.test(n)) return "collaborazione";
+  return "conoscenza";
+}
+const findSettore = n => S.settori.find(s => n.includes(norm(s.nome)) || (norm(s.nome)==="nautica" && /\bbarc|yacht|nautic|cantier/.test(n)) || (norm(s.nome)==="immobiliare" && /immobil|\bcasa\b|appartament|villa/.test(n)));
+
+/* interprete locale: funziona offline, senza AI */
+function localInterpret(text){
+  const azioni = []; let risposta = "";
+  const frasi = text.split(/(?<=[.!?;])\s+|\s*,?\s+(?:e poi|poi)\s+/i).map(s=>s.trim()).filter(Boolean);
+  let ctx = null;
+  for (const f of frasi) {
+    const n = norm(f), who = mentions(f), when = parseWhen(f);
+    if (!who.length && ctx && /\b(richiamal[oa]|chiamal[oa]|sentil[oa]|ricontattal[oa]|mandagli|mandale|scrivigli|scrivile|incontral[oa]|vederl[oa]|gli|le|lui|lei)\b/.test(n)) who.push(ctx);
+    if (who.length) ctx = who[0];
+    let m;
+    /* domande */
+    if ((m = n.match(/chi non (?:sento|contatto|chiamo|vedo|sentiamo|ho sentito)(?: piu)? da (?:almeno |oltre |piu di )?(\d+|un|uno|una|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|dodici) (giorn[oi]|settiman[ae]|mes[ei])/))) {
+      const k = toNum(m[1]), g = m[2][0]==="g" ? k : m[2][0]==="s" ? k*7 : k*30;
+      const l = VP().filter(p => daysSince(p.ultimoContatto) >= g).sort((a,b)=>daysSince(b.ultimoContatto)-daysSince(a.ultimoContatto));
+      risposta += (l.length ? `Non senti da almeno ${g} giorni:\n` + l.map(p => `• ${p.nome} (${daysSince(p.ultimoContatto)} giorni)`).join("\n") : `Hai sentito tutti negli ultimi ${g} giorni.`) + "\n"; continue;
+    }
+    if (/^(chi|quali|quante|quanti|mostra|elenca|fammi vedere|cerca)\b/.test(n) && !/ricord/.test(n)) {
+      if (who.length && /conosce|collegat|collegament|rete di|amici di|tramite/.test(n)) {
+        const p = who[0], rs = VR().filter(r => r.da===p.id || r.a===p.id);
+        let l = rs.map(r => ({o:P(r.da===p.id?r.a:r.da), r}));
+        const st = findSettore(n.replace(norm(p.nome),"")); if (st) l = l.filter(x => x.o.settori.includes(st.id));
+        risposta += (l.length ? `${p.nome} è collegato a:\n` + l.map(x => `• ${x.o.nome} · ${TIPI_REL[x.r.tipo]}${x.o.ruolo?" · "+x.o.ruolo:""}`).join("\n") : `Non vedo collegamenti di ${p.nome}${st?" nel settore "+st.nome:""}.`) + "\n"; continue;
+      }
+      if (/trattativ|affari|opportunit/.test(n)) {
+        const l = VT().filter(t => !["Vinta","Persa"].includes(t.fase));
+        risposta += (l.length ? "Trattative aperte:\n" + l.map(t => `• ${t.titolo} · ${t.fase} · ${eur(t.importo)}`).join("\n") : "Non ci sono trattative aperte.") + "\n"; continue;
+      }
+      const st = findSettore(n), cm = f.match(/\b(?:a|di|in)\s+([A-ZÀ-Ý][a-zà-ÿ]+)\s*[?.!]?$/);
+      let l = VP(); if (st) l = l.filter(p => p.settori.includes(st.id)); if (cm) l = l.filter(p => norm(p.citta) === norm(cm[1]));
+      if (st || cm) { risposta += (l.length ? `Contatti${st?" nel settore "+st.nome:""}${cm?" a "+cm[1]:""}:\n` + l.map(p => `• ${p.nome} · ${p.ruolo}${p.citta?" · "+p.citta:""}`).join("\n") : "Non trovo nessuno con questi criteri.") + "\n"; continue; }
+    }
+    if (/cosa (devo fare|ho da fare|ho in agenda|c e in agenda)|impegni|agenda di/.test(n)) {
+      const d = when.date || TODAY(), l = VA().filter(a => a.data === d && !a.fatto && a.tipo !== "nota");
+      risposta += (l.length ? `In agenda per ${fmtD(d)}:\n` + l.map(a => `• ${a.ora?a.ora+" ":""}${a.testo}`).join("\n") : `Niente in agenda per ${fmtD(d)}.`) + "\n"; continue;
+    }
+    /* nuovo contatto */
+    if ((m = f.match(/^(?:aggiungi|crea|inserisci|registra|salva)?\s*(?:un |una |il |la )?(?:nuov[oa] )?(contatto|persona|cliente|azienda|fornitore|societ[aà])\s+(.+)$/i)) && /aggiung|crea|inserisc|nuov|registra|salva/i.test(f)) {
+      const rest = m[2];
+      const nm = (rest.match(/^((?:[A-ZÀ-Ý][\wà-ÿ'’]*\s?){1,4})/) || [,rest.split(/[,]| che | del | della | di | a /)[0]])[1].trim();
+      const tel = f.match(/(\+?\d[\d\s]{6,}\d)/), mail = f.match(/[\w.+-]+@[\w-]+\.[\w.]+/);
+      const cit = f.match(/\b(?:di|a|vive a|abita a|da)\s+([A-ZÀ-Ý][a-zà-ÿ]+)(?=[\s,.]|$)/g);
+      const citta = cit ? cit.map(c => c.replace(/^\S+(?:\s+a)?\s+/,"")).find(c => !nm.includes(c)) : "";
+      const ruolo = (n.match(/\b(?:e|fa (?:il|la|l)?|di professione|lavora come)\s+(?:un |una |il |la )?(architett[oa]|notaio|avvocat[oa]|commercialista|broker|armatore|agente|ingegnere|geometra|medico|imprenditor[ea]|skipper|capitano|costruttore|banchier[ea]|consulente)/) || [])[1] || "";
+      const st = findSettore(n);
+      azioni.push({tipo:"crea_persona", nome:nm, ruolo: ruolo ? ruolo[0].toUpperCase()+ruolo.slice(1) : "", tipoScheda: /azienda|fornitore|societ/.test(m[1].toLowerCase()) ? "azienda" : "persona", settori: st ? [st.id] : [], telefono: tel ? tel[1].replace(/\s+/g," ") : "", email: mail ? mail[0] : "", citta: citta || ""});
+      for (const o of who) if (/conosce|amic|presentat|lavora con|collega|fratell|sorell|soci/.test(n)) azioni.push({tipo:"crea_relazione", da:nm, a:o.id, relazione:relType(n)});
+      continue;
+    }
+    /* trattative */
+    if (/trattativ|opportunit|affare/.test(n)) {
+      const fase = /\bvint[ao]\b|chius[ao] positiv|firmat|vendut[ao]|\bacquisit[ao]\b/.test(n) ? "Vinta" : /\bpers[ao]\b|saltat[ao]|rinunci/.test(n) ? "Persa" : (n.match(/\b(?:in|a|alla|fase|nella fase) (contatto|proposta|trattativa)\b/)||[])[1]?.replace(/^./, c => c.toUpperCase()) || null;
+      const tr = VT().find(t => norm(f).includes(norm(t.titolo)) || (who[0] && t.personaId === who[0].id));
+      if (/^(nuova|crea|apri|aggiungi|inserisci)|nuova (trattativa|opportunita)/.test(n) || !tr) {
+        let tit = (f.match(/(?:trattativa|opportunità|opportunita|affare)\s+(?:per\s+)?(?:la |il |lo |l')?(.+?)(?=\s+con\s|\s+(?:da|di|per)\s+(?:\d|un|uno|due|tre|quattro|cinque|dieci)\b|,|\.|$)/i) || [])[1] || "Nuova trattativa";
+        tit = tit.trim(); tit = tit[0].toUpperCase() + tit.slice(1);
+        const st = findSettore(n);
+        azioni.push({tipo:"crea_trattativa", titolo: tit, persona: who[0]?.id || null, settore: st?.id || me().settori[0], importo: parseAmount(f) || 0, fase: fase && fase !== "Vinta" && fase !== "Persa" ? fase : "Contatto", scadenza: when.date});
+      } else azioni.push({tipo:"aggiorna_trattativa", trattativa: tr.id, fase: fase || tr.fase, importo: parseAmount(f)});
+      continue;
+    }
+    /* collegamenti */
+    const nuovi = newNames(f);
+    if (/^collega|\bconosce\b|\bsi conoscono\b|presentat|\bamic[oiae] (di|con)\b|\blavora(no)? con\b|\bcollabora\b|fratello|sorella|cugin|moglie|marito|\bsoci[oa]?\b|fornitore di|cliente di/.test(n) && who.length + nuovi.length >= 2 && !/ho (chiamato|sentito)/.test(n)) {
+      const ppl = [...who.map(p=>p.id), ...nuovi];
+      nuovi.forEach(nm => azioni.push({tipo:"crea_persona", nome:nm, settori:[], tipoScheda:"persona"}));
+      let [da, a] = ppl;
+      if (/(e stat[oa]|e stata) presentat[oa] da|presentat[oa] da/.test(n)) [da, a] = [a, da];
+      const nota = f.match(/[:—–-]\s*(.+)$/);
+      azioni.push({tipo:"crea_relazione", da, a, relazione: relType(n), nota: nota ? nota[1] : ""});
+      continue;
+    }
+    /* contatto avvenuto */
+    if (/\bho (chiamato|sentito|telefonato|visto|incontrato|parlato|scritto|mandato)\b|\bmi ha (chiamato|scritto|telefonato)\b|\bsono stato da\b|\bincontrato\b/.test(n) && who.length) {
+      const canale = /scritto|mandato|messaggio|whatsapp|mail/.test(n) ? "messaggio" : /visto|incontrato|stato da/.test(n) ? "appuntamento" : "chiamata";
+      const nota = f.replace(/^.*?\b(?:chiamato|sentito|telefonato|visto|incontrato|parlato con|scritto a|scritto)\s+(?:a\s+|con\s+)?/i,"").replace(new RegExp("^"+who[0].nome.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\s*[,:.]?\\s*","i"),"").replace(/\b(richiamal[oa]|ricontattal[oa]|ricordami)\b.*$/i,"").trim().replace(/[,.]$/,"");
+      azioni.push({tipo:"registra_contatto", persona: who[0].id, canale, testo: nota || (canale==="chiamata"?"Telefonata":"Contatto")});
+      if (/\b(richiama|richiamal|ricontatt|risentir|ricordami|sentirci|risentirci|ci sentiamo)/.test(n) && when.date) azioni.push({tipo:"crea_attivita", persona: who[0].id, attivita: "chiamata", data: when.date, ora: when.ora, testo: `Richiamare ${who[0].nome}`});
+      continue;
+    }
+    /* note */
+    if ((m = f.match(/^(?:aggiungi (?:una )?)?(?:nota|annota|appunto|scrivi)(?: per| su| a| di)?\s+(.+)$/i)) && who.length) {
+      const body = (f.split(/[:]/)[1] || m[1].replace(new RegExp(who[0].nome.split(" ").join("|"),"gi"),"")).trim().replace(/^(che|:)\s*/,"");
+      azioni.push({tipo:"aggiungi_nota", persona: who[0].id, testo: body || f}); continue;
+    }
+    /* aggiornamento dati */
+    if ((m = n.match(/\b(telefono|numero|cellulare|email|mail|citta|ruolo|azienda)\b.*\b(?:e|diventa|nuovo|nuova)\b/)) && who.length) {
+      const campo = {telefono:"telefono",numero:"telefono",cellulare:"telefono",email:"email",mail:"email",citta:"citta",ruolo:"ruolo",azienda:"azienda"}[m[1]];
+      let val = "";
+      if (campo === "telefono") val = (f.match(/(\+?\d[\d\s]{6,}\d)/)||[])[1]; else if (campo === "email") val = (f.match(/[\w.+-]+@[\w-]+\.[\w.]+/)||[])[0];
+      else val = (f.match(/\b(?:è|e|diventa)\s+(.+)$/i)||[])[1];
+      if (val) { azioni.push({tipo:"aggiorna_persona", persona: who[0].id, campi:{[campo]: val.trim().replace(/[.]$/,"")}}); continue; }
+    }
+    /* attività future */
+    if (/ricordami|promemoria|richiam|chiamar|telefonar|appuntament|incontr|riunion|vedere|vedo|sentire|mandare|inviare|scrivere|preparare|fissa/.test(n) && (when.date || /ricordami|promemoria/.test(n))) {
+      const tipo = /appuntament|incontr|riunion|vedere|vedo|sopralluog|cena|pranzo|caffe/.test(n) ? "appuntamento" : /richiam|chiamar|telefonar|sentire/.test(n) ? "chiamata" : "promemoria";
+      let testo = f.replace(/^(ricordami di|ricordami che|ricordami|promemoria:?|metti (un )?promemoria( per)?|fissa (un )?)/i,"").trim();
+      testo = testo.replace(/(^|\s)(oggi|domani|dopodomani|stasera|tra \S+ (?:giorni|giorno|settimane|settimana|mesi|mese)|(?:lunedì|martedì|mercoledì|giovedì|venerdì|sabato|domenica|lunedi|martedi|mercoledi|giovedi|venerdi)(?: prossimo)?|il \d{1,2}(?: (?:gennaio|febbraio|marzo|aprile|maggio|giugno|luglio|agosto|settembre|ottobre|novembre|dicembre))?|alle(?: ore)? \d{1,2}(?:[:.]\d{2})?(?: e mezza)?|del pomeriggio|di mattina|di sera)(?=[\s,.!?]|$)/gi,"$1").replace(/\s{2,}/g," ").replace(/[,.\s]+$/,"").trim();
+      if (who[0] && /^(richiamal[oa]|chiamal[oa]|sentil[oa]|ricontattal[oa])\b/i.test(testo)) testo = `Richiamare ${who[0].nome}`;
+      azioni.push({tipo:"crea_attivita", persona: who[0]?.id || null, attivita: tipo, data: when.date || addDays(1), ora: when.ora, testo: testo ? testo[0].toUpperCase()+testo.slice(1) : TIPI_ATT[tipo]});
+      continue;
+    }
+    if (who.length && f.length > 12) { azioni.push({tipo:"aggiungi_nota", persona: who[0].id, testo: f}); continue; }
+    risposta += `Non ho capito «${f}». Prova con una delle frasi di esempio.\n`;
+  }
+  return {azioni, risposta: risposta.trim()};
+}
+
+/* interprete AI (Claude, se la pagina è aperta su claude.ai) */
+let SAMPLE = null;
+function aiPrompt(text){
+  const u = me();
+  const data = {
+    oggi: TODAY(), giorno: new Date().toLocaleDateString("it-IT",{weekday:"long"}), utente: {id:u.id, nome:u.nome, ruolo:u.ruolo, settori:u.settori},
+    settori: S.settori.map(s=>({id:s.id, nome:s.nome})), utenti: S.utenti.map(x=>({id:x.id, nome:x.nome})), fasi: FASI, tipi_relazione: Object.keys(TIPI_REL),
+    persone: VP().map(p=>({id:p.id, nome:p.nome, tipo:p.tipo, ruolo:p.ruolo, azienda:p.azienda, settori:p.settori, citta:p.citta, ultimoContatto:p.ultimoContatto, tag:p.tag})),
+    relazioni: VR().map(r=>({da:r.da, a:r.a, tipo:r.tipo, nota:r.nota})),
+    trattative: VT().map(t=>({id:t.id, titolo:t.titolo, persona:t.personaId, settore:t.settore, fase:t.fase, importo:t.importo, scadenza:t.scadenza})),
+    attivita: VA().filter(a=>a.data >= addDays(-30)).map(a=>({persona:a.personaId, tipo:a.tipo, data:a.data, ora:a.ora, testo:a.testo, fatto:a.fatto}))
+  };
+  return `Sei l'assistente di un CRM italiano basato sulle relazioni tra persone. L'utente ha dettato a voce il messaggio qui sotto: può contenere errori di trascrizione nei nomi. Trasformalo in azioni sul CRM oppure rispondi alle domande usando SOLO i dati forniti.
+
+DATI (JSON): ${JSON.stringify(data)}
+
+MESSAGGIO DELL'UTENTE: """${text}"""
+
+Rispondi SOLO con un oggetto JSON, senza testo prima o dopo, con questa forma:
+{"azioni":[...], "risposta":"testo per l'utente, vuoto se ci sono solo azioni"}
+Azioni ammesse (per "persona", "da", "a" usa l'id esistente; per una persona nuova creata nello stesso messaggio usa il suo nome esatto):
+{"tipo":"crea_persona","nome":"","tipoScheda":"persona|azienda","ruolo":"","azienda":"","settori":["id settore"],"telefono":"","email":"","citta":""}
+{"tipo":"aggiorna_persona","persona":"id","campi":{"telefono|email|citta|ruolo|azienda":"valore"}}
+{"tipo":"crea_relazione","da":"id o nome","a":"id o nome","relazione":"uno dei tipi_relazione","nota":""}  (per "presentazione": "da" è chi ha presentato)
+{"tipo":"registra_contatto","persona":"id","canale":"chiamata|appuntamento|messaggio","testo":"riassunto di cosa ci si è detti"}
+{"tipo":"crea_attivita","persona":"id o null","attivita":"chiamata|appuntamento|promemoria","data":"AAAA-MM-GG","ora":"HH:MM o vuoto","testo":"cosa fare, breve"}
+{"tipo":"aggiungi_nota","persona":"id","testo":""}
+{"tipo":"crea_trattativa","titolo":"","persona":"id o null","settore":"id","importo":0,"fase":"una delle fasi","scadenza":"AAAA-MM-GG o null"}
+{"tipo":"aggiorna_trattativa","trattativa":"id","fase":"una delle fasi","importo":null}
+Regole: calcola le date relative partendo da oggi. Non inventare dati che l'utente non ha detto. Se un nome non corrisponde a nessuna persona e non è chiaro che vada creato, non creare azioni e chiedi chiarimenti nella risposta. Le risposte alle domande devono essere brevi, in italiano, con un elenco puntato se servono più nomi.`;
+}
+async function interpret(text){
+  try {
+    const {data:{session}} = await sb.auth.getSession();
+    const r = await fetch(BOT + "?interpreta=1", {method:"POST", headers:{Authorization:"Bearer "+session.access_token, "Content-Type":"application/json"}, body:JSON.stringify({testo:text, org:ORG})});
+    const j = await r.json();
+    if (r.ok && Array.isArray(j.azioni)) return {...j, motore:"Claude"};
+  } catch(e) { console.error(e); }
+  return {...localInterpret(text), motore:"interprete locale (Claude non raggiungibile)"};
+}
+
+/* risolve riferimenti a persone: id, nome esistente o nome creato nello stesso messaggio */
+function resolve(ref, created){
+  if (!ref) return null;
+  if (P(ref) && seeP(P(ref))) return ref;
+  if (created[norm(ref)]) return created[norm(ref)];
+  const m = mentions(String(ref)); return m[0]?.id || null;
+}
+function describe(a, pending){
+  const nm = r => { if (!r) return "—"; if (P(r)) return P(r).nome; return pending.has(norm(r)) ? r + " (nuovo)" : r; };
+  switch (a.tipo) {
+    case "crea_persona": return ["Nuovo contatto", `${a.nome}${a.ruolo?" · "+a.ruolo:""}${a.citta?" · "+a.citta:""}${(a.settori||[]).length?" · "+a.settori.map(s=>Sett(s)?.nome).filter(Boolean).join(", "):""}${a.telefono?" · "+a.telefono:""}${a.email?" · "+a.email:""}`];
+    case "aggiorna_persona": return ["Aggiorna scheda", `${nm(a.persona)}: ${Object.entries(a.campi||{}).map(([k,v])=>k+" → "+v).join(", ")}`];
+    case "crea_relazione": return ["Collegamento", `${nm(a.da)} — ${TIPI_REL[a.relazione]||a.relazione} — ${nm(a.a)}${a.nota?" · "+a.nota:""}`];
+    case "registra_contatto": return [({chiamata:"Chiamata registrata",appuntamento:"Incontro registrato",messaggio:"Messaggio registrato"})[a.canale]||"Contatto registrato", `${nm(a.persona)} · oggi · ${a.testo}`];
+    case "crea_attivita": return [TIPI_ATT[a.attivita]||"Promemoria", `${a.testo}${a.persona?" · "+nm(a.persona):""} · ${fmtD(a.data)}${a.ora?" alle "+a.ora:""}`];
+    case "aggiungi_nota": return ["Nota", `${nm(a.persona)}: ${a.testo}`];
+    case "crea_trattativa": return ["Nuova trattativa", `${a.titolo}${a.persona?" · "+nm(a.persona):""} · ${eur(a.importo)} · ${a.fase||"Contatto"}`];
+    case "aggiorna_trattativa": { const t = S.trattative.find(x=>x.id===a.trattativa); return ["Aggiorna trattativa", `${t?.titolo||a.trattativa}${a.fase?" → "+a.fase:""}${a.importo?" · "+eur(a.importo):""}`]; }
+  }
+  return ["Azione", JSON.stringify(a)];
+}
+async function applyAll(list, testo){
+  await CODA;
+  const {data, error} = await sb.rpc("applica_azioni_vocali", {p_org:ORG, p_testo:testo||"", p_azioni:list});
+  if (error) throw error;
+  const esito = data?.esito || [];
+  await loadDb(); render();
+  return {n: esito.filter(e => e.ok).length, skipped: esito.filter(e => !e.ok).length, errori: esito.filter(e => !e.ok).map(e => e.errore)};
+}
+
+/* ================= interfaccia vocale ================= */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false, lastResult = null;
+const EXAMPLES = [
+  "Ho chiamato Giorgio Galli, vuole vedere il Riva sabato. Richiamalo tra 3 giorni",
+  "Aggiungi contatto Franco Moretti, broker, settore nautica, telefono 333 9876543",
+  "Collega Anna Verdi con Lucia Bianchi, sono amiche",
+  "Appuntamento con Chiara Fontana venerdì alle 11",
+  "Nuova trattativa per la villa di Cernobbio con Marco Rossi da 1,2 milioni",
+  "Chi non sento da 3 mesi?",
+  "Chi conosce Marco Rossi nel settore nautica?",
+  "Cosa devo fare domani?"
+];
+function setVState(txt, cls){ const s = $("#vState"); s.textContent = txt; s.className = "pill " + (cls||"neu"); }
+function openVoice(startListening){
+  $("#voice").hidden = false;
+  $("#vEx").innerHTML = EXAMPLES.map(e => `<button type="button">${esc(e)}</button>`).join("");
+  $("#vEngine").textContent = "Interpretazione con Claude";
+  if (startListening) listen(); else $("#vText").focus();
+}
+function closeVoice(){ stopListen(); $("#voice").hidden = true; $("#fab").focus(); }
+function listen(){
+  if (!SR) { setVState("microfono non disponibile", "warn"); $("#vOut").innerHTML = `<p class="muted">Questo browser non supporta la dettatura diretta. Su telefono tocca il microfono della tastiera dentro il riquadro, poi premi «Interpreta».</p>`; $("#vText").focus(); return; }
+  if (listening) { stopListen(); return; }
+  try {
+    rec = new SR(); rec.lang = "it-IT"; rec.interimResults = true; rec.continuous = true;
+    const base = $("#vText").value ? $("#vText").value.trim() + " " : "";
+    let finalTxt = "";
+    rec.onresult = e => { let interim = ""; for (let i = e.resultIndex; i < e.results.length; i++) { const r = e.results[i]; if (r.isFinal) finalTxt += r[0].transcript + " "; else interim += r[0].transcript; } $("#vText").value = (base + finalTxt + interim).replace(/\s+/g," ").trimStart(); };
+    rec.onerror = e => { setVState(e.error === "not-allowed" || e.error === "service-not-allowed" ? "microfono bloccato" : "errore", "warn"); if (e.error === "not-allowed" || e.error === "service-not-allowed") $("#vOut").innerHTML = `<p class="muted">Il microfono non è disponibile in questa pagina. Su telefono usa il microfono della tastiera dentro il riquadro, poi premi «Interpreta». Aprendo il file index.html in Chrome la dettatura diretta funziona.</p>`; };
+    rec.onend = () => { listening = false; $("#fab").classList.remove("rec"); $("#vWave").hidden = true; $("#vMic span").textContent = "Parla"; if ($("#vState").textContent === "ascolto…") { setVState("pronto"); if ($("#vText").value.trim()) runInterpret(); } };
+    rec.start(); listening = true; $("#fab").classList.add("rec"); $("#vWave").hidden = false; $("#vMic span").textContent = "Stop"; setVState("ascolto…", "bad");
+  } catch(e) { setVState("microfono non disponibile", "warn"); }
+}
+function stopListen(){ try { rec?.stop(); } catch(e){} }
+async function runInterpret(){
+  const text = $("#vText").value.trim(); if (!text) { $("#vText").focus(); return; }
+  setVState("interpreto…", "warn"); $("#vGo").disabled = true;
+  $("#vOut").innerHTML = `<p class="muted">Sto chiedendo a Claude…</p>`;
+  const r = await interpret(text);
+  lastResult = r; $("#vGo").disabled = false; setVState("pronto");
+  const pending = new Set((r.azioni||[]).filter(a=>a.tipo==="crea_persona").map(a=>norm(a.nome)));
+  const props = (r.azioni||[]).map((a,i) => { const [k,d] = describe(a, pending); return `<label class="prop"><input type="checkbox" checked data-i="${i}"><div class="t"><div class="k">${esc(k)}</div><div>${esc(d)}</div></div></label>`; }).join("");
+  $("#vOut").innerHTML = `${r.risposta ? `<div class="answer">${esc(r.risposta)}</div>` : ""}
+    ${props ? `<h3>Ho capito queste modifiche · controlla e conferma</h3>${props}<div class="row"><button class="btn pri" id="vApply" ${canEdit()?"":"disabled"}>Conferma e salva</button><button class="btn" id="vDiscard">Annulla</button>${canEdit()?"":'<span class="muted">Con il ruolo «Sola lettura» puoi solo fare domande.</span>'}</div>` : (r.risposta ? "" : `<p class="muted">Non ho trovato modifiche da fare.</p>`)}
+    <p class="muted" style="font-size:12px">Interpretato con: ${esc(r.motore)}</p>`;
+  $("#vApply")?.addEventListener("click", async () => {
+    const sel = [...$("#vOut").querySelectorAll("[data-i]:checked")].map(c => lastResult.azioni[+c.dataset.i]);
+    $("#vApply").disabled = true;
+    try {
+      const {n, skipped, errori} = await applyAll(sel, text);
+      $("#vOut").innerHTML = `<div class="answer">${n===1?"Salvata 1 modifica":`Salvate ${n} modifiche`}${skipped?`. Non salvate ${skipped}: ${esc(errori.join("; "))}`:""}.</div>`;
+      $("#vText").value = ""; toast(n===1 ? "Salvata 1 modifica." : `Salvate ${n} modifiche.`);
+    } catch(e) { $("#vApply").disabled = false; toast("Non salvato: " + (e?.message || "errore")); }
+  });
+  $("#vDiscard")?.addEventListener("click", () => { $("#vOut").innerHTML = ""; });
+}
+$("#fab").onclick = () => { if ($("#voice").hidden) openVoice(true); else listen(); };
+$("#vMic").onclick = listen;
+$("#vGo").onclick = runInterpret;
+$("#vClose").onclick = closeVoice;
+$("#vText").addEventListener("keydown", e => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) runInterpret(); });
+$("#vEx").onclick = e => { const b = e.target.closest("button"); if (b) { $("#vText").value = b.textContent; runInterpret(); } };
+
+/* ================= avvio e accesso ================= */
+try { const t = localStorage.getItem(KEY+".tab"); if (t && TABS.some(x=>x[0]===t)) TAB = t; } catch(e){}
+let RECUPERO = false;
+function mostraLogin(msg, recupero){
+  RECUPERO = !!recupero;
+  $("#login").hidden = false;
+  $("#loginTitle").textContent = recupero ? "Scegli la nuova password" : "Accedi";
+  $("#lEmailBox").hidden = !!recupero; $("#lForgot").hidden = !!recupero;
+  $("#lPwd").autocomplete = recupero ? "new-password" : "current-password";
+  $("#lGo").textContent = recupero ? "Salva password" : "Accedi";
+  $("#loginMsg").textContent = msg || "";
+  (recupero ? $("#lPwd") : $("#lEmail")).focus();
+}
+async function avvia(){
+  const {data:{session}} = await sb.auth.getSession();
+  if (!session) { mostraLogin(); return; }
+  ME = session.user.id;
+  try { await loadDb(); }
+  catch(e) { await sb.auth.signOut(); mostraLogin(e.message || "Accesso non riuscito."); return; }
+  $("#login").hidden = true; renderUsers(); go(TAB);
+}
+$("#loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pwd = $("#lPwd").value;
+  if (RECUPERO) {
+    if (pwd.length < 8) { $("#loginMsg").textContent = "Usa almeno 8 caratteri."; return; }
+    const {error} = await sb.auth.updateUser({password:pwd});
+    if (error) { $("#loginMsg").textContent = error.message; return; }
+    history.replaceState(null, "", location.pathname); toast("Password aggiornata."); avvia(); return;
+  }
+  $("#loginMsg").textContent = "Accesso in corso…";
+  const {error} = await sb.auth.signInWithPassword({email:$("#lEmail").value.trim(), password:pwd});
+  if (error) { $("#loginMsg").textContent = "Email o password non corretti."; return; }
+  avvia();
+});
+$("#lForgot").onclick = async () => {
+  const email = $("#lEmail").value.trim();
+  if (!email) { $("#loginMsg").textContent = "Scrivi prima la tua email."; $("#lEmail").focus(); return; }
+  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: location.origin + location.pathname});
+  $("#loginMsg").textContent = error ? error.message : "Ti ho mandato un'email con il link per scegliere una nuova password.";
+};
+sb.auth.onAuthStateChange(ev => { if (ev === "PASSWORD_RECOVERY") mostraLogin("", true); });
+function cambiaPassword(){
+  openForm("Cambia password", [
+    {id:"p1", label:"Nuova password (almeno 8 caratteri)", type:"password", required:true, full:true},
+    {id:"p2", label:"Ripeti la nuova password", type:"password", required:true, full:true}
+  ], v => {
+    if (v.p1.length < 8) return "Usa almeno 8 caratteri.";
+    if (v.p1 !== v.p2) return "Le due password non coincidono.";
+    sb.auth.updateUser({password:v.p1}).then(({error}) => toast(error ? "Password non cambiata: " + error.message : "Password cambiata."));
+  }, "Cambia");
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && ORG) loadDb().then(render).catch(()=>{}); });
+/* tema: automatico segue il telefono o il PC; la scelta resta salvata */
+let themeMine = false;
+function applyTheme(v){
+  const r = document.documentElement;
+  if (v === "light" || v === "dark") { r.setAttribute("data-theme", v); themeMine = true; }
+  else if (themeMine) { r.removeAttribute("data-theme"); themeMine = false; }
+  $("#themeSel").value = v;
+}
+try { applyTheme(localStorage.getItem(KEY+".tema") || "auto"); } catch(e){ applyTheme("auto"); }
+$("#themeSel").onchange = e => { applyTheme(e.target.value); try { localStorage.setItem(KEY+".tema", e.target.value); } catch(err){} };
+setupMap(); avvia();
+window.addEventListener("resize", () => { if (TAB==="mappa" && !fitted) fit(); });
+window.NCRM = {localInterpret, parseWhen, parseAmount, mentions, applyAll};
+</script>
+</body></html>
