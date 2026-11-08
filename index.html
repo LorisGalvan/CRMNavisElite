@@ -125,6 +125,27 @@ label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mu
 .zoom{position:absolute;right:max(12px,env(safe-area-inset-right,0px));bottom:calc(88px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:4px}
 .zoom .btn{width:38px;height:38px;justify-content:center;padding:0;box-shadow:var(--shadow)}
 .maphint{position:absolute;left:max(12px,env(safe-area-inset-left,0px));bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:12px;color:var(--muted);max-width:min(420px,calc(100% - 110px));box-shadow:var(--shadow)}
+/* sfondo video della mappa: veli per il contrasto e controlli in vetro (solo con .board.live) */
+:root{--shade:60,45,30;--shade-k:.5;--glass:rgba(255,255,255,.62);--glass-line:rgba(0,0,0,.08)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--shade:10,13,18;--shade-k:1;--glass:rgba(24,24,27,.55);--glass-line:rgba(255,255,255,.14)}}
+:root[data-theme="dark"]{--shade:10,13,18;--shade-k:1;--glass:rgba(24,24,27,.55);--glass-line:rgba(255,255,255,.14)}
+.mapbg{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:0;transition:opacity .6s}
+.mapbg.on{opacity:1}
+.mapbg-video{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 40%}
+.mapbg-shade{position:absolute;inset:0;background:
+  linear-gradient(90deg,rgba(var(--shade),calc(var(--shade-k)*.55)),rgba(var(--shade),calc(var(--shade-k)*.35)) 35%,rgba(var(--shade),calc(var(--shade-k)*.15)) 70%,rgba(var(--shade),calc(var(--shade-k)*.25))),
+  linear-gradient(180deg,rgba(var(--shade),calc(var(--shade-k)*.10)),rgba(var(--shade),calc(var(--shade-k)*.05)) 35%,rgba(var(--shade),calc(var(--shade-k)*.25)) 70%,rgba(var(--shade),calc(var(--shade-k)*.55)))}
+.board{z-index:1}
+.board.live{background:transparent}
+.mapbar,.zoom,.maphint{z-index:2}
+.board.live .node{filter:drop-shadow(0 6px 14px rgba(0,0,0,.35))}
+.board.live .edge{filter:drop-shadow(0 1px 2px rgba(0,0,0,.5))}
+.board.live .edge-lbl-bg{opacity:1;stroke:rgba(0,0,0,.25);filter:drop-shadow(0 2px 5px rgba(0,0,0,.4))}
+.board.live~.mapbar .glass,.board.live~.mapbar .btn,.board.live~.zoom .btn,.board.live~.maphint{background:var(--glass);border-color:var(--glass-line);-webkit-backdrop-filter:blur(14px) saturate(115%);backdrop-filter:blur(14px) saturate(115%)}
+.board.live~.mapbar .btn:hover,.board.live~.zoom .btn:hover{background:var(--surface)}
+.board.live~.maphint{color:var(--ink)}
+.board.live~.mapbar input::placeholder{color:var(--ink);opacity:.72}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
 
 /* rubrica */
 .tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r);background:var(--surface)}
@@ -206,6 +227,10 @@ tbody tr:hover{background:var(--surface-2)}
 <main>
   <section class="view gut" id="v-panoramica"></section>
   <section class="view" id="v-mappa" hidden>
+    <div class="mapbg" aria-hidden="true">
+      <video class="mapbg-video" autoplay muted loop playsinline preload="metadata"></video>
+      <div class="mapbg-shade"></div>
+    </div>
     <div class="board" id="board"><svg id="svg" aria-label="Mappa delle relazioni"><g id="vp"><g id="gEdges"></g><g id="gNodes"></g></g></svg></div>
     <div class="mapbar">
       <div class="glass"><input type="search" id="mapSearch" placeholder="Cerca sulla lavagna"></div>
@@ -264,6 +289,7 @@ tbody tr:hover{background:var(--surface-2)}
 "use strict";
 /* ================= dati ================= */
 const KEY = "networkcrm.cloud";
+const MAP_BG_VIDEO = "https://d8j0ntlcm91z4.cloudfront.net/user_38xzZboKViGWJOttwIXH07lWA1P/hf_20260826_124724_bc041163-d651-425f-aea3-2acc1efc2c96.mp4"; // alternativa: …/hf_20261005_182346_a590ff3b-72e5-41ce-8f69-a8c823eaecaa.mp4 (stessa cartella)
 const FASI = ["Contatto","Proposta","Trattativa","Vinta","Persa"];
 const TIPI_REL = {conoscenza:"Si conoscono",amicizia:"Amicizia",parentela:"Parentela",collaborazione:"Lavorano insieme",presentazione:"Ha presentato",socio:"Soci",cliente:"Cliente di",fornitore:"Fornitore di"};
 const TIPI_ATT = {chiamata:"Chiamata",appuntamento:"Appuntamento",promemoria:"Promemoria",nota:"Nota",messaggio:"Messaggio"};
@@ -396,6 +422,7 @@ function descriviRegistro(l){
 const me = () => S.utenti.find(u => u.id === ME) || {id:ME, nome:"", ruolo:"lettura", settori:[]};
 const isAdmin = (u=me()) => u.ruolo === "admin";
 const canEdit = (u=me()) => u.ruolo !== "lettura";
+const canDelP = (p,u=me()) => canEdit(u) && (isAdmin(u) || p.creatoDa === u.id); // come la policy persone_del
 const inter = (a,b) => (a||[]).some(x => (b||[]).includes(x));
 function seeP(p,u=me()){
   if (!p) return false;
@@ -428,7 +455,7 @@ const fmtD = d => d ? new Date(d+"T12:00:00").toLocaleDateString("it-IT",{weekda
 const daysSince = d => d ? Math.round((new Date(TODAY()+"T12:00:00") - new Date(d+"T12:00:00"))/86400000) : 9999;
 function toast(msg){ const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role","status"); t.textContent = msg; $("#toastHost").replaceChildren(t); setTimeout(() => t.remove(), 3200); }
 const sChip = id => { const s = Sett(id); return s ? `<span class="chip"><i style="background:${s.colore}"></i>${esc(s.nome)}</span>` : ""; };
-const pLink = id => { const p = P(id); return p && seeP(p) ? `<button class="link" data-open="${p.id}">${esc(p.nome)}</button>` : `<span class="muted">riservato</span>`; };
+const pLink = id => { if (!id) return `<span class="muted">senza contatto</span>`; const p = P(id); return p && seeP(p) ? `<button class="link" data-open="${p.id}">${esc(p.nome)}</button>` : `<span class="muted">riservato</span>`; };
 
 /* ================= tabs ================= */
 const TABS = [["panoramica","Panoramica"],["mappa","Mappa"],["rubrica","Rubrica"],["trattative","Trattative"],["agenda","Agenda"],["permessi","Permessi"],["registro","Registro"]];
@@ -441,7 +468,7 @@ function go(tab){
   try { localStorage.setItem(KEY+".tab", tab); } catch(e){}
   renderTabs();
   TABS.forEach(([k]) => $("#v-"+k).hidden = k !== tab);
-  render();
+  render(); mapBg();
 }
 function render(){
   ({panoramica:rOverview, mappa:rMap, rubrica:rRubrica, trattative:rDeals, agenda:rAgenda, permessi:rPerm, registro:rLog})[TAB]();
@@ -577,6 +604,27 @@ function nodeTap(id){
   SEL = SEL === id ? null : id; drawMap(); if (SEL) openDrawer(id);
 }
 
+/* sfondo video: si carica alla prima apertura della Mappa, gira solo lì e solo con la pagina visibile; altrimenti resta il sughero */
+let bgStato = null; // null = mai provato, "attesa", "live", "off" = sughero
+const mapBgOk = () => { const c = navigator.connection; return !matchMedia("(prefers-reduced-motion: reduce)").matches && !c?.saveData && !/2g$/.test(c?.effectiveType || ""); };
+function mapBgOff(){ const v = $(".mapbg-video"); bgStato = "off"; v.pause(); v.removeAttribute("src"); v.load(); $("#board").classList.remove("live"); $(".mapbg").classList.remove("on"); }
+function mapBg(){
+  const v = $(".mapbg-video");
+  if ($("#v-mappa").hidden || document.hidden) { v.pause(); return; } // la tab non è aperta (o c'è ancora il login)
+  if (bgStato === "off") return;
+  if (!bgStato) {
+    if (!mapBgOk()) { bgStato = "off"; return; }
+    bgStato = "attesa";
+    const t = setTimeout(() => { if (bgStato === "attesa") mapBgOff(); }, 6000);
+    v.addEventListener("loadeddata", () => { if (bgStato !== "attesa") return; clearTimeout(t); bgStato = "live"; $("#board").classList.add("live"); $(".mapbg").classList.add("on"); }, {once:true});
+    v.addEventListener("error", () => { clearTimeout(t); if (bgStato !== "off") mapBgOff(); }, {once:true});
+    v.src = MAP_BG_VIDEO;
+  }
+  v.play()?.catch(() => {});
+}
+matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", e => { if (e.matches && bgStato !== "off") mapBgOff(); });
+document.addEventListener("visibilitychange", mapBg);
+
 /* ================= rubrica ================= */
 let rubQ = "", rubS = "";
 function rRubrica(){
@@ -663,6 +711,7 @@ function openDrawer(id, refresh){
       ${rels.length?`<ul class="list">${rels.map(r => { const o = r.da===id ? r.a : r.da; return `<li><div class="t">${pLink(o)}<div class="muted" style="font-size:12px">${esc(TIPI_REL[r.tipo]||r.tipo)}${r.da!==id&&r.tipo==="presentazione"?" (ha presentato "+esc(p.nome)+")":""}${r.nota?" · "+esc(r.nota):""}${r.visibilita==="privato"?' · <span class="pill warn">privato</span>':""}</div></div>${canEdit()?`<button class="btn ghost sm" data-delrel="${r.id}" aria-label="Elimina collegamento">✕</button>`:""}</li>`; }).join("")}</ul>`:'<p class="muted">Nessun collegamento visibile.</p>'}</div>
     <div class="stack"><h3>Trattative · ${deals.length}</h3>${deals.length?`<ul class="list">${deals.map(t=>`<li><div class="t">${esc(t.titolo)}<div class="muted" style="font-size:12px">${t.fase} · ${esc(U(t.responsabile)?.nome||"")}</div></div><span class="mono">${eur(t.importo)}</span></li>`).join("")}</ul>`:'<p class="muted">Nessuna trattativa visibile.</p>'}</div>
     <div class="stack"><h3>Cronologia</h3>${acts.length?`<ul class="list">${acts.map(a=>`<li><div class="t">${esc(a.testo)}<div class="muted" style="font-size:12px">${TIPI_ATT[a.tipo]} · ${esc(U(a.assegnatoA)?.nome||"")}${a.fatto?" · fatto":""}</div></div><span class="when">${fmtD(a.data)}</span></li>`).join("")}</ul>`:'<p class="muted">Ancora niente.</p>'}</div>
+    ${canDelP(p)?`<div class="row" style="justify-content:flex-end;border-top:1px solid var(--line);padding-top:14px"><button class="btn ghost sm danger" data-act="delP" data-p="${id}" aria-label="Elimina ${esc(p.nome)}">Elimina contatto</button></div>`:""}
   </div>`;
   d.hidden = false;
   if (!refresh) d.querySelector("button")?.focus();
@@ -696,6 +745,47 @@ function openForm(title, fields, onSubmit, submitLabel="Salva"){
     close(); save(); render();
   });
   sc.querySelector("input,select,textarea")?.focus();
+}
+function openConfirm(title, html, label, onOk){
+  const sc = document.createElement("div"); sc.className = "scrim";
+  sc.innerHTML = `<div class="modal" role="alertdialog" aria-modal="true" aria-labelledby="cfT"><h2 id="cfT">${esc(title)}</h2><div class="stack">${html}</div><div class="row" style="justify-content:flex-end"><button type="button" class="btn" data-x>Annulla</button><button type="button" class="btn pri" data-ok style="background:var(--bad);border-color:var(--bad)">${esc(label)}</button></div></div>`;
+  document.body.append(sc);
+  const back = document.activeElement, close = () => { sc.remove(); back?.isConnected && back.focus(); };
+  sc.querySelector("[data-x]").onclick = close;
+  sc.querySelector("[data-ok]").onclick = () => { sc.remove(); onOk(); };
+  sc.addEventListener("click", e => { if (e.target === sc) close(); });
+  sc.addEventListener("keydown", e => { if (e.key === "Escape") { e.stopPropagation(); close(); } });
+  sc.querySelector("[data-x]").focus();
+}
+function confirmDelP(id){
+  const p = P(id); if (!guard() || !p || !canDelP(p)) return;
+  const nr = S.relazioni.filter(r => r.da===id || r.a===id).length, na = S.attivita.filter(a => a.personaId===id).length, nt = S.trattative.filter(t => t.personaId===id).length;
+  const via = [nr && `${nr} ${nr===1?"collegamento":"collegamenti"}`, na && `${na} attività/promemoria`].filter(Boolean);
+  const txt = [via.length && `${via.length>1||nr>1||na>1 ? "Verranno eliminati" : nr ? "Verrà eliminato" : "Verrà eliminata"} anche ${via.join(" e ")}.`,
+    nt && (nt===1 ? "1 trattativa collegata resterà, senza contatto." : `Le ${nt} trattative collegate resteranno, senza contatto.`)].filter(Boolean);
+  openConfirm(`Eliminare definitivamente ${p.nome}?`, (txt.length ? txt.map(x => `<p style="margin:0">${esc(x)}</p>`).join("") : "") + `<p class="muted" style="margin:0">L'operazione non si può annullare.</p>`, "Elimina", () => delPersona(id));
+}
+function delPersona(id){
+  if (!guard()) return;
+  const p = P(id); if (!p || !canDelP(p)) return;
+  const nome = p.nome;
+  S.persone = S.persone.filter(x => x !== p);
+  S.relazioni = S.relazioni.filter(r => r.da !== id && r.a !== id);
+  S.attivita = S.attivita.filter(a => a.personaId !== id);
+  S.trattative.forEach(t => { if (t.personaId === id) t.personaId = null; });
+  // il database cancella a cascata collegamenti, attività, settori e condivisioni e stacca le trattative (SET NULL):
+  // lo rispecchio nell'ultima lettura, così sincronizza() invia una sola DELETE su persone e, se viene rifiutata, non resta nulla a metà
+  if (SNAP) {
+    for (const t of ["relazioni","attivita","persone_settori","persone_condivisioni"]) for (const [k, r] of Object.entries(SNAP[t])) if (r.persona_id===id || r.da===id || r.a===id) delete SNAP[t][k];
+    Object.values(SNAP.trattative).forEach(r => { if (r.persona_id === id) r.persona_id = null; });
+  }
+  if (SEL === id) SEL = null;
+  if (LINKING === id) LINKING = null;
+  closeDrawer(); log(`Eliminato il contatto ${nome}`);
+  // save() ricarica sempre dal server: se le policy hanno bloccato la cancellazione la scheda ricompare
+  save().then(() => { if (P(id)) toast(`${nome} non è stato eliminato: non hai i permessi per farlo.`); });
+  render(); toast("Contatto eliminato");
+  $(TAB==="rubrica" ? "#rubQ" : TAB==="mappa" ? "#mapSearch" : "#tabs [aria-selected=true]")?.focus({preventScroll:true});
 }
 const optP = () => [["","—"], ...VP().sort((a,b)=>a.nome.localeCompare(b.nome)).map(p=>[p.id,p.nome])];
 const optU = () => S.utenti.map(u=>[u.id,u.nome]);
@@ -820,7 +910,7 @@ document.addEventListener("click", e => {
   ({
     newP: () => formPerson(), newA: () => formActivity(pid), newT: formDeal, voice: openVoice,
     call: () => formActivity(pid, "chiamata"), note: () => formActivity(pid, "nota"), edit: () => formPerson(pid),
-    link: () => formRelation(pid, ""), closeDrawer, export: doExport,
+    link: () => formRelation(pid, ""), closeDrawer, delP: () => confirmDelP(pid), export: doExport,
     newS: () => formSettore(), editS: () => formSettore(b.dataset.s), newU: formUtente,
     delS: () => { if (!isAdmin()) return; const st = Sett(b.dataset.s); if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Conferma"; b.classList.add("pri"); return; }
       S.settori = S.settori.filter(x => x !== st); S.persone.forEach(p => p.settori = p.settori.filter(x => x !== st.id)); S.utenti.forEach(u => u.settori = u.settori.filter(x => x !== st.id)); mapHidden.delete(st.id);
