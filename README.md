@@ -2,7 +2,7 @@
 
 App online: **https://lorisgalvan.github.io/CRMNavisElite/**
 
-Network CRM è un CRM condiviso in cui ogni persona è una scheda appuntata su una lavagna e i rapporti sono fili rossi. Oltre a rubrica, trattative, agenda e permessi, adesso si aggiorna **anche a voce**: dici cosa è successo, lui propone le modifiche e salva solo dopo la tua conferma.
+Navis Elite CRM è un CRM condiviso in cui ogni persona è una scheda appuntata su una lavagna e i rapporti sono fili rossi. Oltre a rubrica, trattative, agenda e permessi, adesso si aggiorna **anche a voce**: dici cosa è successo, lui propone le modifiche e salva solo dopo la tua conferma.
 
 ```
   App web (PC e telefono)                       Telegram (vocali)

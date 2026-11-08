@@ -1,5 +1,5 @@
 -- =====================================================================
--- Network CRM · schema Supabase (PostgreSQL 15+) · v1.1
+-- Navis Elite CRM · schema Supabase (PostgreSQL 15+) · v1.1
 -- CRM condiviso con visibilità ibrida per autorizzazione:
 --   * l'amministratore vede tutto;
 --   * gli altri vedono le schede condivise con tutti, quelle dei propri

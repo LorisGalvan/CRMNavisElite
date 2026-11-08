@@ -1,4 +1,4 @@
-// Genera i workflow n8n del Network CRM a partire dal codice in src/code.
+// Genera i workflow n8n del Navis Elite CRM a partire dal codice in src/code.
 // Uso: node n8n/src/build.mjs
 import fs from 'node:fs';
 import path from 'node:path';
