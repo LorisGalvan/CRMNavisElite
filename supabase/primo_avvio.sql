@@ -1,5 +1,5 @@
 -- =====================================================================
--- Network CRM · primo avvio (da eseguire UNA volta, dopo schema.sql)
+-- Navis Elite CRM · primo avvio (da eseguire UNA volta, dopo schema.sql)
 --
 -- Prima di eseguirlo: Authentication → Users → "Invite user" per
 --   loris4386@gmail.com ed enrico.berte@gmail.com
@@ -10,7 +10,7 @@
 
 -- organizzazione
 insert into organizzazioni (nome)
-select 'Network CRM' where not exists (select 1 from organizzazioni);
+select 'Navis Elite CRM' where not exists (select 1 from organizzazioni);
 
 -- settori (se ne aggiungono altri in qualsiasi momento con una riga in più)
 insert into settori (org_id, nome, colore)

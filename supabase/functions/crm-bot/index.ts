@@ -1,4 +1,4 @@
-// Network CRM · bot Telegram (Supabase Edge Function, fa ciò che facevano i workflow n8n)
+// Navis Elite CRM · bot Telegram (Supabase Edge Function, fa ciò che facevano i workflow n8n)
 //   POST /crm-bot                    aggiornamenti da Telegram (vocali, messaggi, pulsanti, /collega)
 //   GET  /crm-bot?setup=1            registra questo indirizzo come webhook del bot
 //   POST /crm-bot?promemoria=1       invia i promemoria in scadenza (lo chiama pg_cron ogni 15 minuti)

@@ -1,6 +1,6 @@
 # Installazione automatica · istruzioni per Claude
 
-Questo file serve a una nuova sessione di Claude Code per installare il Network CRM
+Questo file serve a una nuova sessione di Claude Code per installare il Navis Elite CRM
 al posto di Loris, usando i segreti salvati nelle impostazioni dell'ambiente cloud.
 I segreti NON vanno mai scritti in chat, nei commit o nei log.
 
